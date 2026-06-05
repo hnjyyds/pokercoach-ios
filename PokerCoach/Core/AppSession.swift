@@ -144,6 +144,59 @@ final class AppSession {
         }
     }
 
+    func generateHandQuiz(focus: String, difficulty: String, street: String) async -> HandQuiz? {
+        guard let token, !usesOfflineMock else {
+            let quiz = MockFixtures.generatedHandQuiz(focus: focus, difficulty: difficulty, street: street)
+            handQuizzes.insert(quiz, at: 0)
+            return quiz
+        }
+
+        do {
+            let quiz = try await apiClient.generateHandQuiz(
+                focus: focus,
+                difficulty: difficulty,
+                street: street,
+                token: token
+            )
+            handQuizzes.insert(quiz, at: 0)
+            return quiz
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
+    func answerHandQuiz(_ quiz: HandQuiz, answer: String) async -> DecisionResult {
+        guard let token, !usesOfflineMock else {
+            return MockFixtures.result(for: quiz, answer: answer)
+        }
+
+        do {
+            return try await apiClient.answerHandQuiz(id: quiz.id, answer: answer, token: token)
+        } catch {
+            return MockFixtures.result(for: quiz, answer: answer)
+        }
+    }
+
+    func coachHandQuiz(id: String, message: String) async -> HandQuiz? {
+        guard let token, !usesOfflineMock else {
+            guard let quiz = MockFixtures.replyToHandQuiz(id: id, message: message, quizzes: handQuizzes) else {
+                return nil
+            }
+            replaceHandQuiz(quiz)
+            return quiz
+        }
+
+        do {
+            let quiz = try await apiClient.coachHandQuiz(id: id, message: message, token: token)
+            replaceHandQuiz(quiz)
+            return quiz
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
     func calculateOdds(heroHand: String, board: String, outs: Int) async -> OddsResponse {
         guard let token, !usesOfflineMock else {
             return MockFixtures.odds(heroHand: heroHand, board: board, outs: outs)
@@ -277,6 +330,14 @@ final class AppSession {
             } else {
                 errorMessage = error.localizedDescription
             }
+        }
+    }
+
+    private func replaceHandQuiz(_ quiz: HandQuiz) {
+        if let index = handQuizzes.firstIndex(where: { $0.id == quiz.id }) {
+            handQuizzes[index] = quiz
+        } else {
+            handQuizzes.insert(quiz, at: 0)
         }
     }
 }

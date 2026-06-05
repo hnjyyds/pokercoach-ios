@@ -119,6 +119,17 @@ struct HandQuiz: Codable, Identifiable, Hashable {
     let options: [String]
     let answer: String
     let explanation: String
+    var sourceAgent: String? = nil
+    var agentIcon: String? = nil
+    var agentAccent: String? = nil
+    var thesis: String? = nil
+    var street: String? = nil
+    var position: String? = nil
+    var stackDepthBb: Int? = nil
+    var potBb: Double? = nil
+    var difficulty: String? = nil
+    var conceptTags: [String]? = nil
+    var coachMessages: [CoachMessageSnapshot]? = nil
 }
 
 struct DecisionResult: Codable, Hashable {
@@ -133,6 +144,16 @@ struct OddsRequest: Encodable {
     let heroHand: String
     let board: String
     let outs: Int
+}
+
+struct HandQuizGenerateRequestBody: Encodable {
+    let focus: String
+    let difficulty: String
+    let street: String
+}
+
+struct HandQuizAnswerRequestBody: Encodable {
+    let answer: String
 }
 
 struct OddsResponse: Codable, Hashable {

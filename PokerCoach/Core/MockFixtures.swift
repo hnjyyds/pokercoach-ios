@@ -212,17 +212,108 @@ enum MockFixtures {
     ]
 
     static let handQuizzes: [HandQuiz] = [
-        HandQuiz(
-            id: "hq_001",
-            heroHand: "Ah Kh",
-            villainHand: "Qs Qd",
-            board: "Th Jh 2c 3h 9s",
-            question: "河牌摊牌谁赢？",
-            options: ["Hero", "Villain", "平局"],
-            answer: "Hero",
-            explanation: "Hero 用手牌和公共牌组成高张同花，击败 Villain 的一对高张。"
-        )
+        {
+            var quiz = HandQuiz(
+                id: "hq_001",
+                heroHand: "Ah Kh",
+                villainHand: "Qs Qd",
+                board: "Th Jh 2c 3h 9s",
+                question: "河牌摊牌谁赢？",
+                options: ["Hero", "Villain", "平局"],
+                answer: "Hero",
+                explanation: "Hero 用手牌和公共牌组成高张同花，击败 Villain 的一对高张。"
+            )
+            quiz.sourceAgent = "Ivy"
+            quiz.agentIcon = "brain.head.profile"
+            quiz.agentAccent = "#10B981"
+            quiz.thesis = "从摊牌结构倒推：先找最佳五张牌，再比较牌型层级。"
+            quiz.street = "river"
+            quiz.position = "BTN"
+            quiz.stackDepthBb = 100
+            quiz.potBb = 12.5
+            quiz.difficulty = "新手"
+            quiz.conceptTags = ["牌型识别", "摊牌判断"]
+            quiz.coachMessages = [
+                CoachMessageSnapshot(
+                    id: "quiz_seed_msg",
+                    role: "agent",
+                    content: "这题可以当成牌型比较训练：先找 Hero 最佳五张，再找对手最佳五张。",
+                    createdAt: "2026-06-05T00:00:00+00:00"
+                )
+            ]
+            return quiz
+        }()
     ]
+
+    static func generatedHandQuiz(focus: String, difficulty: String, street: String) -> HandQuiz {
+        var quiz = HandQuiz(
+            id: "hq_agent_mock_\(UUID().uuidString.prefix(8))",
+            heroHand: focus.contains("赔率") ? "As Qs" : "8c 8d",
+            villainHand: focus.contains("赔率") ? "Kh Kd" : "As Kd",
+            board: focus.contains("赔率") ? "Ts 7s 2c" : "8h Ac Ks 2d 2s",
+            question: focus.contains("赔率") ? "面对下注，Hero 的继续理由主要是什么？" : "Hero 最终牌型是什么？",
+            options: focus.contains("赔率") ? ["同花听牌 + 高张权益", "已经成牌领先", "只能弃牌"] : ["三条", "葫芦", "两对"],
+            answer: focus.contains("赔率") ? "同花听牌 + 高张权益" : "葫芦",
+            explanation: focus.contains("赔率")
+                ? "Hero 还没有成牌领先，但有同花听牌和高张改进空间。关键是权益实现和下注价格是否允许继续。"
+                : "Hero 的口袋对子命中三条，再配公共牌对子，最终组成葫芦。"
+        )
+        quiz.sourceAgent = focus.contains("赔率") ? "Nash" : "Ivy"
+        quiz.agentIcon = focus.contains("赔率") ? "percent" : "sparkles"
+        quiz.agentAccent = focus.contains("赔率") ? "#14B8A6" : "#F59E0B"
+        quiz.thesis = focus.contains("赔率")
+            ? "听牌题先算可改进牌，再看底池赔率是否支持继续。"
+            : "摊牌判断要从最佳五张牌出发，而不是只看手牌名字。"
+        quiz.street = street
+        quiz.position = focus.contains("赔率") ? "BTN" : "BB"
+        quiz.stackDepthBb = difficulty == "进阶" ? 150 : 80
+        quiz.potBb = focus.contains("赔率") ? 9.5 : 18
+        quiz.difficulty = difficulty
+        quiz.conceptTags = focus.contains("赔率") ? ["底池赔率", "听牌", "权益实现"] : ["牌型识别", "摊牌判断"]
+        quiz.coachMessages = [
+            CoachMessageSnapshot(
+                id: "quiz_agent_seed_msg",
+                role: "agent",
+                content: "这题的论点是：\(cleanSentence(quiz.thesis ?? ""))。先只看牌面图形、位置和底池，不要急着背答案。",
+                createdAt: "2026-06-05T00:00:00+00:00"
+            )
+        ]
+        return quiz
+    }
+
+    static func result(for quiz: HandQuiz, answer: String) -> DecisionResult {
+        DecisionResult(
+            isCorrect: answer == quiz.answer,
+            recommendation: quiz.answer,
+            explanation: quiz.explanation,
+            conceptTags: quiz.conceptTags ?? ["牌型识别"],
+            nextPrompt: answer == quiz.answer ? "可以继续追问导师：如果有效后手更深，答案会不会改变？" : "建议围绕当前题目的论点追问导师。"
+        )
+    }
+
+    static func replyToHandQuiz(id: String, message: String, quizzes: [HandQuiz]) -> HandQuiz? {
+        guard var quiz = quizzes.first(where: { $0.id == id }) ?? handQuizzes.first else { return nil }
+        let currentMessages = quiz.coachMessages ?? []
+        quiz.coachMessages = currentMessages + [
+            CoachMessageSnapshot(
+                id: "quiz_user_msg",
+                role: "user",
+                content: message,
+                createdAt: "2026-06-05T00:00:00+00:00"
+            ),
+            CoachMessageSnapshot(
+                id: "quiz_agent_msg",
+                role: "agent",
+                content: "围绕当前题目的论点，我会先抓三个点：\((quiz.conceptTags ?? []).prefix(3).joined(separator: "、"))。推荐答案是“\(quiz.answer)”，但真正要记住的是：\(cleanSentence(quiz.thesis ?? quiz.explanation))。",
+                createdAt: "2026-06-05T00:00:00+00:00"
+            )
+        ]
+        return quiz
+    }
+
+    private static func cleanSentence(_ value: String) -> String {
+        value.trimmingCharacters(in: CharacterSet(charactersIn: "。.!！?"))
+    }
 
     static func result(for scenario: PreflopScenario, action: PokerAction) -> DecisionResult {
         DecisionResult(

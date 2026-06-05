@@ -353,15 +353,37 @@ private struct ActionOptionButton: View {
 private struct HandQuizListView: View {
     @Environment(AppSession.self) private var session
     @State private var selectedAnswers: [String: String] = [:]
+    @State private var results: [String: DecisionResult] = [:]
+    @State private var selectedQuiz: HandQuiz?
+    @State private var focus = "牌力识别"
+    @State private var difficulty = "新手"
+    @State private var street = "river"
+    @State private var isGenerating = false
+
+    private let focusOptions = ["牌力识别", "底池赔率", "范围判断"]
+    private let difficultyOptions = ["新手", "进阶"]
+    private let streetOptions = ["flop", "turn", "river"]
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 22) {
+                generatorPanel
+
                 if session.handQuizzes.isEmpty {
                     EmptyStateView(icon: "suit.heart", title: "暂无牌力题", message: "mock 题库会在首页数据加载后出现。")
                 } else {
                     ForEach(session.handQuizzes) { quiz in
-                        quizView(quiz)
+                        AgentQuizCard(
+                            quiz: quiz,
+                            selectedAnswer: selectedAnswers[quiz.id],
+                            result: results[quiz.id],
+                            onSelect: { option in
+                                Task { await select(option, for: quiz) }
+                            },
+                            onAskCoach: {
+                                selectedQuiz = quiz
+                            }
+                        )
                     }
                 }
             }
@@ -369,49 +391,411 @@ private struct HandQuizListView: View {
             .padding(.top, 8)
             .padding(.bottom, PokerLayout.floatingTabBarClearance)
         }
+        .sheet(item: $selectedQuiz) { quiz in
+            QuizCoachSheet(quiz: quiz)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .task {
+            if session.handQuizzes.isEmpty {
+                await session.loadHomeData()
+            }
+        }
     }
 
-    private func quizView(_ quiz: HandQuiz) -> some View {
-        VStack(alignment: .leading, spacing: 15) {
-            Label(quiz.question, systemImage: "suit.spade.fill")
-                .font(.title3.weight(.black))
-                .foregroundStyle(PokerTheme.ink)
+    private var generatorPanel: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                Image(systemName: "sparkles")
+                    .font(.headline.weight(.black))
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 36)
+                    .background(PokerTheme.ink, in: Circle())
 
-            VStack(alignment: .leading, spacing: 6) {
-                HandQuizCardsLine(label: "Hero", cards: quiz.heroHand, tint: PokerTheme.felt)
-                HandQuizCardsLine(label: "Villain", cards: quiz.villainHand, tint: PokerTheme.coral)
-                HandQuizCardsLine(label: "公共牌", cards: quiz.board, tint: PokerTheme.ink, cardWidth: 30, cardHeight: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Agent 生成题")
+                        .font(.headline.weight(.black))
+                        .foregroundStyle(PokerTheme.ink)
+                    Text("围绕一个论点生成可追问案例")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(PokerTheme.muted)
+                }
+
+                Spacer(minLength: 0)
+
+                Button {
+                    Task { await generateQuiz() }
+                } label: {
+                    Image(systemName: isGenerating ? "hourglass" : "plus")
+                        .font(.headline.weight(.black))
+                        .foregroundStyle(.white)
+                        .frame(width: 42, height: 42)
+                        .background(PokerTheme.ink.opacity(isGenerating ? 0.58 : 1), in: Circle())
+                }
+                .buttonStyle(TrainingPressButtonStyle())
+                .disabled(isGenerating)
+                .accessibilityLabel("生成 Agent 题目")
             }
 
-            HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
+                QuizOptionPicker(title: "重点", options: focusOptions, selection: $focus)
+                QuizOptionPicker(title: "难度", options: difficultyOptions, selection: $difficulty)
+                QuizOptionPicker(title: "街道", options: streetOptions, selection: $street)
+            }
+        }
+    }
+
+    private func select(_ option: String, for quiz: HandQuiz) async {
+        withAnimation(.spring(response: 0.30, dampingFraction: 0.78)) {
+            selectedAnswers[quiz.id] = option
+        }
+        let result = await session.answerHandQuiz(quiz, answer: option)
+        withAnimation(.spring(response: 0.30, dampingFraction: 0.84)) {
+            results[quiz.id] = result
+        }
+    }
+
+    private func generateQuiz() async {
+        guard !isGenerating else { return }
+        isGenerating = true
+        defer { isGenerating = false }
+        _ = await session.generateHandQuiz(focus: focus, difficulty: difficulty, street: street)
+    }
+}
+
+private struct QuizOptionPicker: View {
+    let title: String
+    let options: [String]
+    @Binding var selection: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(title)
+                .font(.caption.weight(.black))
+                .foregroundStyle(PokerTheme.muted)
+                .frame(width: 36, alignment: .leading)
+
+            ForEach(options, id: \.self) { option in
+                Button {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                        selection = option
+                    }
+                } label: {
+                    Text(option)
+                        .font(.caption.weight(.black))
+                        .foregroundStyle(selection == option ? .white : PokerTheme.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.74)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(selection == option ? PokerTheme.ink : Color.white.opacity(0.52), in: Capsule())
+                }
+                .buttonStyle(TrainingPressButtonStyle())
+                .accessibilityValue(selection == option ? "已选择" : "未选择")
+            }
+        }
+    }
+}
+
+private struct AgentQuizCard: View {
+    let quiz: HandQuiz
+    let selectedAnswer: String?
+    let result: DecisionResult?
+    let onSelect: (String) -> Void
+    let onAskCoach: () -> Void
+
+    private var accent: Color {
+        Color(hex: quiz.agentAccent ?? "#8B5CF6")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 10) {
+                Image(systemName: quiz.agentIcon ?? "sparkles")
+                    .font(.headline.weight(.black))
+                    .foregroundStyle(.white)
+                    .frame(width: 38, height: 38)
+                    .background(accent, in: Circle())
+                    .shadow(color: accent.opacity(0.14), radius: 12, y: 6)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(quiz.sourceAgent ?? "Agent") 生成")
+                        .font(.headline.weight(.black))
+                        .foregroundStyle(PokerTheme.ink)
+                    Text(quiz.thesis ?? "围绕当前题目建立一个清晰论点。")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(PokerTheme.muted)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+
+                Button(action: onAskCoach) {
+                    Image(systemName: "message.fill")
+                        .font(.headline.weight(.black))
+                        .foregroundStyle(PokerTheme.ink)
+                        .frame(width: 42, height: 42)
+                        .background(Color.white.opacity(0.60), in: Circle())
+                }
+                .buttonStyle(TrainingPressButtonStyle())
+                .accessibilityLabel("围绕当前题目问导师")
+            }
+
+            QuizMetaRail(quiz: quiz, accent: accent)
+
+            QuizCardsScene(quiz: quiz)
+
+            Text(quiz.question)
+                .font(.title3.weight(.black))
+                .foregroundStyle(PokerTheme.ink)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 10) {
                 ForEach(quiz.options, id: \.self) { option in
                     Button {
-                        withAnimation(.spring(response: 0.30, dampingFraction: 0.78)) {
-                            selectedAnswers[quiz.id] = option
-                        }
+                        onSelect(option)
                     } label: {
                         QuizOptionButton(
                             title: option,
-                            isSelected: selectedAnswers[quiz.id] == option,
+                            isSelected: selectedAnswer == option,
                             isCorrect: option == quiz.answer
                         )
                     }
                     .buttonStyle(TrainingPressButtonStyle())
                     .accessibilityLabel(option)
-                    .accessibilityValue(selectedAnswers[quiz.id] == option ? "已选择" : "未选择")
+                    .accessibilityValue(selectedAnswer == option ? "已选择" : "未选择")
                     .frame(maxWidth: .infinity)
                 }
             }
 
-            if let selected = selectedAnswers[quiz.id] {
-                Text(selected == quiz.answer ? quiz.explanation : "正确答案是 \(quiz.answer)。\(quiz.explanation)")
-                    .font(.subheadline)
-                    .foregroundStyle(PokerTheme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+            if let result {
+                QuizResultPanel(result: result, answer: quiz.answer, accent: accent)
+                    .transition(.opacity)
+            }
+        }
+        .padding(.vertical, 6)
+    }
+}
+
+private struct QuizMetaRail: View {
+    let quiz: HandQuiz
+    let accent: Color
+
+    var body: some View {
+        HStack(spacing: 12) {
+            QuizMiniMetric(icon: "location.fill", value: quiz.position ?? "BTN", tint: accent)
+            QuizMiniMetric(icon: "suit.spade.fill", value: (quiz.street ?? "river").capitalized, tint: PokerTheme.ink)
+            QuizMiniMetric(icon: "circle.grid.3x3.fill", value: quizBb(Double(quiz.stackDepthBb ?? 100)), tint: PokerTheme.amber)
+            QuizMiniMetric(icon: "target", value: quiz.difficulty ?? "新手", tint: PokerTheme.felt)
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+private struct QuizMiniMetric: View {
+    let icon: String
+    let value: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.caption.weight(.black))
+                .foregroundStyle(tint)
+            Text(value)
+                .font(.caption.monospacedDigit().weight(.black))
+                .foregroundStyle(PokerTheme.ink)
+                .lineLimit(1)
+        }
+    }
+}
+
+private struct QuizCardsScene: View {
+    let quiz: HandQuiz
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 14) {
+                HandQuizCardsLine(label: "Hero", cards: quiz.heroHand, tint: PokerTheme.felt)
+                HandQuizCardsLine(label: "对手", cards: quiz.villainHand, tint: PokerTheme.coral)
+            }
+
+            HandQuizCardsLine(label: "公共牌", cards: quiz.board, tint: PokerTheme.ink, cardWidth: 28, cardHeight: 38)
+        }
+    }
+}
+
+private struct QuizResultPanel: View {
+    let result: DecisionResult
+    let answer: String
+    let accent: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: result.isCorrect ? "checkmark.seal.fill" : "xmark.seal.fill")
+                    .font(.headline.weight(.black))
+                    .foregroundStyle(result.isCorrect ? PokerTheme.felt : PokerTheme.coral)
+                Text(result.isCorrect ? "判断正确" : "推荐答案：\(answer)")
+                    .font(.subheadline.weight(.black))
+                    .foregroundStyle(PokerTheme.ink)
+            }
+
+            Text(result.explanation)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(PokerTheme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 7) {
+                ForEach(result.conceptTags.prefix(3), id: \.self) { tag in
+                    Text(tag)
+                        .font(.caption2.weight(.black))
+                        .foregroundStyle(accent)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(accent.opacity(0.10), in: Capsule())
+                }
             }
         }
     }
+}
+
+private struct QuizCoachSheet: View {
+    @Environment(AppSession.self) private var session
+    @Environment(\.dismiss) private var dismiss
+    @State var quiz: HandQuiz
+    @State private var draft = ""
+    @State private var isSending = false
+
+    private var messages: [CoachMessageSnapshot] {
+        quiz.coachMessages ?? []
+    }
+
+    var body: some View {
+        ZStack {
+            PokerGlassBackdrop()
+                .ignoresSafeArea()
+            PokerAmbientLayer()
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 12) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.headline.weight(.black))
+                            .foregroundStyle(PokerTheme.ink)
+                            .frame(width: 38, height: 38)
+                            .background(Color.white.opacity(0.62), in: Circle())
+                    }
+                    .buttonStyle(TrainingPressButtonStyle())
+                    .accessibilityLabel("关闭导师对话")
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(quiz.sourceAgent ?? "Agent") 导师")
+                            .font(.title3.weight(.black))
+                            .foregroundStyle(PokerTheme.ink)
+                        Text(quiz.thesis ?? quiz.question)
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(PokerTheme.muted)
+                            .lineLimit(2)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+
+                QuizCardsScene(quiz: quiz)
+
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(messages) { message in
+                            QuizCoachBubble(message: message)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 4)
+                }
+
+                HStack(spacing: 10) {
+                    TextField("围绕这题追问导师", text: $draft, axis: .vertical)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(PokerTheme.ink)
+                        .lineLimit(1...3)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .background(Color.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .textFieldStyle(.plain)
+
+                    Button {
+                        Task { await send() }
+                    } label: {
+                        Image(systemName: isSending ? "hourglass" : "arrow.up")
+                            .font(.headline.weight(.black))
+                            .foregroundStyle(.white)
+                            .frame(width: 42, height: 42)
+                            .background(PokerTheme.ink.opacity(canSend ? 1 : 0.42), in: Circle())
+                    }
+                    .buttonStyle(TrainingPressButtonStyle())
+                    .disabled(!canSend)
+                    .accessibilityLabel("发送给导师")
+                }
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 18)
+            .padding(.bottom, 18)
+        }
+    }
+
+    private var canSend: Bool {
+        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending
+    }
+
+    private func send() async {
+        let message = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !message.isEmpty, !isSending else { return }
+        draft = ""
+        isSending = true
+        defer { isSending = false }
+        if let updated = await session.coachHandQuiz(id: quiz.id, message: message) {
+            withAnimation(.spring(response: 0.30, dampingFraction: 0.84)) {
+                quiz = updated
+            }
+        }
+    }
+}
+
+private struct QuizCoachBubble: View {
+    let message: CoachMessageSnapshot
+
+    private var isUser: Bool {
+        message.role == "user"
+    }
+
+    var body: some View {
+        HStack(alignment: .top) {
+            if isUser { Spacer(minLength: 44) }
+
+            Text(message.content)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(isUser ? .white : PokerTheme.ink)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 13)
+                .padding(.vertical, 10)
+                .background(isUser ? PokerTheme.ink : Color.white.opacity(0.70), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+            if !isUser { Spacer(minLength: 44) }
+        }
+    }
+}
+
+private func quizBb(_ value: Double) -> String {
+    if abs(value.rounded() - value) < 0.001 {
+        return "\(Int(value.rounded()))BB"
+    }
+    return String(format: "%.1fBB", value)
 }
 
 private struct HandQuizCardsLine: View {
