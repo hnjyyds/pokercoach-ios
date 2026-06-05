@@ -531,6 +531,8 @@ private struct AgentQuizCard: View {
 
                 Spacer(minLength: 0)
 
+                AgentStatusBadge(quiz: quiz)
+
                 Button(action: onAskCoach) {
                     Image(systemName: "message.fill")
                         .font(.headline.weight(.black))
@@ -575,6 +577,56 @@ private struct AgentQuizCard: View {
             }
         }
         .padding(.vertical, 6)
+    }
+}
+
+private struct AgentStatusBadge: View {
+    let quiz: HandQuiz
+
+    private var isOnline: Bool {
+        quiz.isBackedByLiveLLM
+    }
+
+    private var tint: Color {
+        isOnline ? PokerTheme.felt : PokerTheme.muted
+    }
+
+    private var statusLabel: String {
+        isOnline ? "Agent 在线" : "规则兜底"
+    }
+
+    private var sourceLabel: String? {
+        guard let source = quiz.llmSource?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !source.isEmpty else {
+            return nil
+        }
+        return source
+    }
+
+    private var accessibilityText: String {
+        if let sourceLabel {
+            return "\(statusLabel)，\(sourceLabel)"
+        }
+        return statusLabel
+    }
+
+    var body: some View {
+        Image(systemName: isOnline ? "wifi" : "shield.fill")
+            .font(.caption.weight(.black))
+            .foregroundStyle(tint)
+            .frame(width: 28, height: 28)
+            .background(Color.white.opacity(0.64), in: Circle())
+            .overlay(alignment: .topTrailing) {
+                Circle()
+                    .fill(tint)
+                    .frame(width: 7, height: 7)
+                    .overlay {
+                        Circle()
+                            .stroke(Color.white, lineWidth: 1.4)
+                    }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilityText)
     }
 }
 
@@ -703,6 +755,8 @@ private struct QuizCoachSheet: View {
                             .foregroundStyle(PokerTheme.muted)
                             .lineLimit(2)
                     }
+
+                    AgentStatusBadge(quiz: quiz)
 
                     Spacer(minLength: 0)
                 }

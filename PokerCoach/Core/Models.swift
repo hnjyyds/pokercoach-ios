@@ -119,6 +119,8 @@ struct HandQuiz: Codable, Identifiable, Hashable {
     let options: [String]
     let answer: String
     let explanation: String
+    var llmSource: String? = nil
+    var isLlmGenerated: Bool? = nil
     var sourceAgent: String? = nil
     var agentIcon: String? = nil
     var agentAccent: String? = nil
@@ -130,6 +132,13 @@ struct HandQuiz: Codable, Identifiable, Hashable {
     var difficulty: String? = nil
     var conceptTags: [String]? = nil
     var coachMessages: [CoachMessageSnapshot]? = nil
+
+    var isBackedByLiveLLM: Bool {
+        if let isLlmGenerated {
+            return isLlmGenerated
+        }
+        return !(llmSource?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+    }
 }
 
 struct DecisionResult: Codable, Hashable {
