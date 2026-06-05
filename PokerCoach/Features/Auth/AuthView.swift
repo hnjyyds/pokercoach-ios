@@ -500,11 +500,18 @@ private enum WorkbenchModule: String, CaseIterable, Identifiable {
         }
     }
 
-    var scenario: String {
+    var scenarioTitle: String {
         switch self {
-        case .preflop: "CO 2.5BB · BTN AKo"
+        case .preflop: "CO 2.5BB · BTN"
         case .hand: "Turn · 同花听牌"
         case .odds: "Pot Odds · 32%"
+        }
+    }
+
+    var scenarioHandClass: String? {
+        switch self {
+        case .preflop: "AKo"
+        default: nil
         }
     }
 
@@ -766,15 +773,29 @@ private struct CoachPreviewCard: View {
                     .symbolEffect(.bounce, value: tapToken)
             }
 
-            Text(module.scenario)
-                .font(.subheadline.weight(.black))
-                .foregroundStyle(Color(hex: "#071226"))
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
-                .padding(.horizontal, 12)
-                .frame(height: 38)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(hex: "#F8FAFD").opacity(0.92), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+            HStack(spacing: 8) {
+                Text(module.scenarioTitle)
+                    .font(.subheadline.weight(.black))
+                    .foregroundStyle(Color(hex: "#071226"))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+
+                if let handClass = module.scenarioHandClass {
+                    PlayingCardsRow(
+                        handClass: handClass,
+                        width: 24,
+                        height: 32,
+                        spacing: -5,
+                        rotation: 2
+                    )
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 38)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(hex: "#F8FAFD").opacity(0.92), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
 
             HStack(spacing: 8) {
                 Image(systemName: module.symbol)

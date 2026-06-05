@@ -397,16 +397,21 @@ private struct MistakeRow: View {
                 .shadow(color: tint.opacity(0.18), radius: 9, y: 5)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(mistake.title)
+                Text(mistakeDisplayTitle(mistake))
                     .font(.subheadline.weight(.black))
                     .foregroundStyle(PokerTheme.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
 
                 HStack(spacing: 8) {
-                    Text(mistake.heroCards.joined(separator: " "))
-                        .font(.caption.monospaced().weight(.black))
-                        .foregroundStyle(PokerTheme.ink)
+                    PlayingCardsRow(
+                        cardCodes: mistake.heroCards,
+                        width: 24,
+                        height: 32,
+                        spacing: -5,
+                        rotation: 2
+                    )
+
                     Text("你\(mistake.userActionLabel) · 应\(mistake.recommendedActionLabel)")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(PokerTheme.muted)
@@ -514,7 +519,7 @@ private struct MistakeReviewView: View {
         PokerPageHeader(
             eyebrow: "错题复盘",
             title: "\(summary.position) Spot",
-            subtitle: summary.title,
+            subtitle: mistakeDisplayTitle(summary),
             icon: summary.icon,
             tint: Color(hex: summary.accent)
         )
@@ -672,18 +677,10 @@ private struct MistakeSpotView: View {
                             .font(.title3.weight(.black))
                             .foregroundStyle(PokerTheme.ink)
                     } else {
-                        HStack(spacing: -7) {
-                            ForEach(detail.board, id: \.self) { card in
-                                ReviewCardToken(code: card)
-                            }
-                        }
+                        PlayingCardsRow(cardCodes: detail.board, width: 42, height: 56, spacing: -7, rotation: 3)
                     }
 
-                    HStack(spacing: -6) {
-                        ForEach(detail.heroCards, id: \.self) { card in
-                            ReviewCardToken(code: card)
-                        }
-                    }
+                    PlayingCardsRow(cardCodes: detail.heroCards, width: 42, height: 56, spacing: -6, rotation: 3)
                     .overlay(alignment: .topTrailing) {
                         Image(systemName: "eye.fill")
                             .font(.caption.weight(.black))
@@ -878,41 +875,6 @@ private struct SeatContextChip: View {
     }
 }
 
-private struct ReviewCardToken: View {
-    let code: String
-
-    var body: some View {
-        VStack(spacing: 1) {
-            Text(rank)
-                .font(.headline.monospaced().weight(.black))
-            Text(suit)
-                .font(.subheadline.weight(.black))
-        }
-        .foregroundStyle(tint)
-        .frame(width: 42, height: 56)
-        .background(.white.opacity(0.96), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .shadow(color: PokerTheme.ink.opacity(0.08), radius: 10, y: 5)
-    }
-
-    private var rank: String {
-        guard let first = code.first else { return code }
-        return first == "T" ? "10" : String(first)
-    }
-
-    private var suit: String {
-        switch code.last {
-        case "h": "♥"
-        case "d": "♦"
-        case "c": "♣"
-        default: "♠"
-        }
-    }
-
-    private var tint: Color {
-        code.hasSuffix("h") || code.hasSuffix("d") ? PokerTheme.coral : PokerTheme.ink
-    }
-}
-
 private func streetDisplay(_ street: String) -> String {
     switch street {
     case "preflop": "Preflop"
@@ -921,6 +883,17 @@ private func streetDisplay(_ street: String) -> String {
     case "river": "River"
     default: street.capitalized
     }
+}
+
+private func mistakeDisplayTitle(_ mistake: BattleMistakeSummary) -> String {
+    let trimmed = mistake.title.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.contains("：") {
+        return "\(mistake.position) 决策偏差"
+    }
+    if trimmed.range(of: #"[AKQJT2-9]{2}[so]?"#, options: .regularExpression) != nil {
+        return "\(mistake.position) 决策偏差"
+    }
+    return trimmed
 }
 
 private func bb(_ value: Double) -> String {

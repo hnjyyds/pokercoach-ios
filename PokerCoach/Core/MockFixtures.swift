@@ -37,7 +37,7 @@ enum MockFixtures {
     static let mistakeDetails: [BattleMistakeDetail] = [
         BattleMistakeDetail(
             id: "seed_usr_demo_utg_kqo",
-            title: "KQo 面对 UTG 加注",
+            title: "面对 UTG 加注",
             subtitle: "CO · Preflop · 反向隐含赔率",
             street: "preflop",
             position: "CO",
@@ -75,20 +75,20 @@ enum MockFixtures {
                     BattleMistakeTableSeat(seatIndex: 3, position: "UTG", name: "River", stackBb: 98, committedBb: 2.5, status: "active", isHero: false),
                     BattleMistakeTableSeat(seatIndex: 5, position: "CO", name: "Alex", stackBb: 100, committedBb: 0, status: "active", isHero: true)
                 ],
-                tags: ["CO", "KQo", "被主导", "高SPR"]
+                tags: ["CO", "被主导", "高SPR"]
             ),
             candidates: [
-                BattleMistakeCandidate(action: "fold", label: "弃牌", targetTotalBb: 0, evBb: 0.2, weight: 0.55, isRecommended: true, reason: "UTG 范围强，KQo 容易被 AQ/AK/KQs 主导。"),
+                BattleMistakeCandidate(action: "fold", label: "弃牌", targetTotalBb: 0, evBb: 0.2, weight: 0.55, isRecommended: true, reason: "UTG 范围强，这类高张非同花组合容易被顶张强范围和高对子主导。"),
                 BattleMistakeCandidate(action: "call", label: "跟注", targetTotalBb: 2.5, evBb: -0.9, weight: 0.30, isRecommended: false, reason: "高 SPR 下反向隐含赔率变大，翻后容易支付强牌。"),
                 BattleMistakeCandidate(action: "raise", label: "3-bet", targetTotalBb: 8, evBb: -0.3, weight: 0.15, isRecommended: false, reason: "阻断不足，面对 4-bet 难继续。")
             ],
-            whyWrong: "KQo 看起来像高张强牌，但面对 UTG 紧范围，经常被 AK、AQ、QQ+ 主导；深筹码时跟注会把自己带进难打的大底池。",
+            whyWrong: "这类高张非同花组合看起来很顺眼，但面对 UTG 紧范围经常被顶张强范围和高对子主导；深筹码时跟注会把自己带进难打的大底池。",
             correctPlay: "新手阶段直接弃牌，保留筹码进入位置更好、范围更清晰的 spot。",
             coachMessages: [
                 CoachMessageSnapshot(
                     id: "seed_msg_utg_1",
                     role: "agent",
-                    content: "这手重点不是 KQ 漂亮，而是 UTG 范围太强。先把被主导风险排除，会少输很多大底池。",
+                    content: "这手重点不是两张高张好看，而是 UTG 范围太强。先把被主导风险排除，会少输很多大底池。",
                     createdAt: "2026-06-05T00:00:00+00:00"
                 )
             ]
@@ -134,14 +134,14 @@ enum MockFixtures {
                     BattleMistakeTableSeat(seatIndex: 1, position: "SB", name: "Alex", stackBb: 99.5, committedBb: 0.5, status: "active", isHero: true),
                     BattleMistakeTableSeat(seatIndex: 2, position: "BB", name: "Ivy", stackBb: 99, committedBb: 1, status: "active", isHero: false)
                 ],
-                tags: ["SB", "Q8s", "位置劣势", "高SPR"]
+                tags: ["SB", "位置劣势", "高SPR"]
             ),
             candidates: [
                 BattleMistakeCandidate(action: "fold", label: "弃牌", targetTotalBb: 0.5, evBb: 0.1, weight: 0.50, isRecommended: true, reason: "小盲位翻后全程失位，边缘同花牌实现权益困难。"),
                 BattleMistakeCandidate(action: "call", label: "跟注", targetTotalBb: 2.5, evBb: -0.7, weight: 0.34, isRecommended: false, reason: "容易形成被动多人池，翻后难以控池。"),
                 BattleMistakeCandidate(action: "raise", label: "3-bet", targetTotalBb: 9, evBb: -0.2, weight: 0.16, isRecommended: false, reason: "阻断牌不足，面对继续范围权益不够。")
             ],
-            whyWrong: "小盲位没有位置，Q8s 的同花潜力不足以弥补翻后实现权益差；跟注还会给大盲好价格进入底池。",
+            whyWrong: "小盲位没有位置，这类边缘同花牌的潜力不足以弥补翻后实现权益差；跟注还会给大盲好价格进入底池。",
             correctPlay: "直接弃牌或只在明确 exploit 对手过度开池时低频 3-bet，不要默认平跟。",
             coachMessages: [
                 CoachMessageSnapshot(
@@ -170,8 +170,8 @@ enum MockFixtures {
             ],
             recommendedAction: .raise,
             recommendedSizing: "2.5BB",
-            conceptTags: ["位置优势", "偷盲", "同花A"],
-            explanation: "按钮位面对无人入池时范围可以明显打开。A9s 有阻断强A、同花潜力和位置优势，标准策略是开放加注而不是 limp。"
+            conceptTags: ["位置优势", "偷盲", "同花高牌"],
+            explanation: "按钮位面对无人入池时范围可以明显打开。这类同花高牌有阻断顶张范围、同花潜力和位置优势，标准策略是开放加注而不是 limp。"
         ),
         PreflopScenario(
             id: "pf_002",
@@ -189,7 +189,7 @@ enum MockFixtures {
             recommendedAction: .fold,
             recommendedSizing: "-",
             conceptTags: ["反向隐含赔率", "位置", "范围压制"],
-            explanation: "KQo 面对 UTG 强范围容易被 AK、AQ、QQ+ 压制。CO 位置还没有绝对优势，新手阶段建议先弃牌。"
+            explanation: "这类高张非同花组合面对 UTG 强范围容易被顶张强范围和高对子压制。CO 位置还没有绝对优势，新手阶段建议先弃牌。"
         ),
         PreflopScenario(
             id: "pf_003",
@@ -220,7 +220,7 @@ enum MockFixtures {
             question: "河牌摊牌谁赢？",
             options: ["Hero", "Villain", "平局"],
             answer: "Hero",
-            explanation: "Hero 用 Ah Kh 和公共牌 Th Jh 3h 组成 A 高同花，击败 Villain 的一对 Q。"
+            explanation: "Hero 用手牌和公共牌组成高张同花，击败 Villain 的一对高张。"
         )
     ]
 

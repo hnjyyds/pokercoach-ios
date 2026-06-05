@@ -2,8 +2,8 @@ import SwiftUI
 
 struct OddsCalculatorView: View {
     @Environment(AppSession.self) private var session
-    @State private var heroHand = "Ah Kh"
-    @State private var board = "Th Jh 2c"
+    @State private var heroHand = ""
+    @State private var board = ""
     @State private var outs = 9
     @State private var result: OddsResponse?
     @State private var isCalculating = false
@@ -42,8 +42,8 @@ struct OddsCalculatorView: View {
 
     private var inputSurface: some View {
         VStack(alignment: .leading, spacing: 18) {
-            FreeformInput(icon: "suit.spade.fill", placeholder: "手牌，例如 Ah Kh", text: $heroHand)
-            FreeformInput(icon: "tablecells.fill", placeholder: "公共牌，例如 Th Jh 2c", text: $board)
+            FreeformInput(icon: "suit.spade.fill", placeholder: "输入手牌", text: $heroHand)
+            FreeformInput(icon: "tablecells.fill", placeholder: "输入公共牌", text: $board)
 
             HStack(spacing: 18) {
                 Image(systemName: "scope")
@@ -107,10 +107,10 @@ struct OddsCalculatorView: View {
                     Spacer(minLength: 0)
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("\(result.heroHand)  |  Board \(result.board)")
-                        .font(.subheadline.monospaced().weight(.semibold))
-                        .foregroundStyle(PokerTheme.ink)
+                VStack(alignment: .leading, spacing: 10) {
+                    OddsCardsLine(label: "手牌", cards: result.heroHand, tint: PokerTheme.ink)
+                    OddsCardsLine(label: "公共牌", cards: result.board, tint: PokerTheme.felt, cardWidth: 31, cardHeight: 42)
+
                     Text(result.coachingNote)
                         .font(.subheadline)
                         .foregroundStyle(PokerTheme.muted)
@@ -129,6 +129,33 @@ struct OddsCalculatorView: View {
 
     private func percent(_ value: Double) -> String {
         value.formatted(.percent.precision(.fractionLength(0)))
+    }
+}
+
+private struct OddsCardsLine: View {
+    let label: String
+    let cards: String
+    let tint: Color
+    var cardWidth: CGFloat = 35
+    var cardHeight: CGFloat = 47
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(label)
+                .font(.caption.weight(.black))
+                .foregroundStyle(tint)
+                .frame(width: 48, alignment: .leading)
+
+            PlayingCardsRow(
+                cardText: cards,
+                width: cardWidth,
+                height: cardHeight,
+                spacing: -6,
+                rotation: 2
+            )
+
+            Spacer(minLength: 0)
+        }
     }
 }
 

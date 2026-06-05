@@ -316,19 +316,156 @@ struct PokerAmbientLayer: View {
     }
 }
 
-struct PlayingCardToken: View {
-    let text: String
+struct PlayingCardsRow: View {
+    let cards: [String]
+    var width: CGFloat = 42
+    var height: CGFloat = 56
+    var spacing: CGFloat = -7
+    var rotation: Double = 3
 
-    var body: some View {
-        Text(text)
-            .font(.title3.weight(.bold))
-            .foregroundStyle(cardColor)
-            .frame(width: 54, height: 70)
-            .background(.white.opacity(0.96), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .shadow(color: Color(hex: "#071226").opacity(0.08), radius: 10, y: 5)
+    init(
+        cardCodes: [String],
+        width: CGFloat = 42,
+        height: CGFloat = 56,
+        spacing: CGFloat = -7,
+        rotation: Double = 3
+    ) {
+        cards = cardCodes
+        self.width = width
+        self.height = height
+        self.spacing = spacing
+        self.rotation = rotation
     }
 
-    private var cardColor: Color {
-        text.contains("h") || text.contains("d") || text.contains("♥") || text.contains("♦") ? PokerTheme.coral : PokerTheme.ink
+    init(
+        cardText: String,
+        width: CGFloat = 42,
+        height: CGFloat = 56,
+        spacing: CGFloat = -7,
+        rotation: Double = 3
+    ) {
+        cards = CardVisualValue.codes(fromCardText: cardText)
+        self.width = width
+        self.height = height
+        self.spacing = spacing
+        self.rotation = rotation
+    }
+
+    init(
+        handClass: String,
+        width: CGFloat = 42,
+        height: CGFloat = 56,
+        spacing: CGFloat = -7,
+        rotation: Double = 3
+    ) {
+        cards = CardVisualValue.codes(fromHandClass: handClass)
+        self.width = width
+        self.height = height
+        self.spacing = spacing
+        self.rotation = rotation
+    }
+
+    var body: some View {
+        HStack(spacing: spacing) {
+            ForEach(Array(cards.enumerated()), id: \.offset) { index, card in
+                PlayingCardToken(code: card, width: width, height: height)
+                    .rotationEffect(.degrees(rotation(for: index)))
+            }
+        }
+    }
+
+    private func rotation(for index: Int) -> Double {
+        guard rotation != 0 else { return 0 }
+        return index.isMultiple(of: 2) ? -rotation : rotation
+    }
+}
+
+struct PlayingCardToken: View {
+    let code: String
+    var width: CGFloat = 42
+    var height: CGFloat = 56
+
+    init(text: String, width: CGFloat = 42, height: CGFloat = 56) {
+        code = text
+        self.width = width
+        self.height = height
+    }
+
+    init(code: String, width: CGFloat = 42, height: CGFloat = 56) {
+        self.code = code
+        self.width = width
+        self.height = height
+    }
+
+    var body: some View {
+        let card = CardVisualValue(code: code)
+
+        VStack(spacing: max(0, height * 0.02)) {
+            Text(card.rank)
+                .font(.system(size: max(11, width * 0.36), weight: .black, design: .rounded))
+            Text(card.suit)
+                .font(.system(size: max(10, width * 0.30), weight: .black, design: .rounded))
+        }
+        .foregroundStyle(card.tint)
+        .frame(width: width, height: height)
+        .background(.white.opacity(0.96), in: RoundedRectangle(cornerRadius: max(8, width * 0.23), style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: max(8, width * 0.23), style: .continuous)
+                .stroke(.white.opacity(0.86), lineWidth: 1)
+        }
+        .shadow(color: Color(hex: "#071226").opacity(0.08), radius: 10, y: 5)
+        .accessibilityLabel("扑克牌")
+    }
+}
+
+private struct CardVisualValue {
+    let rank: String
+    let suit: String
+    let tint: Color
+
+    init(code: String) {
+        let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = trimmed.replacingOccurrences(of: "10", with: "T").uppercased()
+        let rankCode = String(normalized.dropLast())
+        let suitCode = normalized.suffix(1).lowercased()
+
+        rank = rankCode == "T" ? "10" : (rankCode.isEmpty ? "?" : rankCode)
+        switch suitCode {
+        case "h":
+            suit = "♥"
+            tint = PokerTheme.coral
+        case "d":
+            suit = "♦"
+            tint = PokerTheme.coral
+        case "c":
+            suit = "♣"
+            tint = PokerTheme.ink
+        default:
+            suit = "♠"
+            tint = PokerTheme.ink
+        }
+    }
+
+    static func codes(fromCardText text: String) -> [String] {
+        text
+            .split(whereSeparator: { $0.isWhitespace || $0 == "," || $0 == "|" || $0 == "/" })
+            .map(String.init)
+            .filter { $0.count >= 2 }
+    }
+
+    static func codes(fromHandClass handClass: String) -> [String] {
+        let normalized = handClass.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard normalized.count >= 2 else { return [] }
+        let ranks = normalized.filter { "23456789TJQKA".contains($0) }
+        guard ranks.count >= 2 else { return [] }
+        let first = String(ranks[ranks.startIndex])
+        let second = String(ranks[ranks.index(after: ranks.startIndex)])
+        if first == second {
+            return ["\(first)s", "\(second)h"]
+        }
+        if normalized.hasSuffix("S") {
+            return ["\(first)s", "\(second)s"]
+        }
+        return ["\(first)s", "\(second)h"]
     }
 }

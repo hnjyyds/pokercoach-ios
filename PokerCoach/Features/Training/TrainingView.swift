@@ -159,10 +159,13 @@ private struct PreflopTrainerView: View {
                     }
 
                 VStack(spacing: 10) {
-                    Text(scenario.hand)
-                        .font(.system(size: 58, weight: .black, design: .rounded))
-                        .foregroundStyle(PokerTheme.ink)
-                        .lineLimit(1)
+                    PlayingCardsRow(
+                        handClass: scenario.hand,
+                        width: 58,
+                        height: 78,
+                        spacing: -10,
+                        rotation: 4
+                    )
 
                     Text(scenario.tableState)
                         .font(.headline.weight(.bold))
@@ -350,13 +353,9 @@ private struct HandQuizListView: View {
                 .foregroundStyle(PokerTheme.ink)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Hero \(quiz.heroHand)")
-                    .font(.headline.monospaced().weight(.black))
-                    .foregroundStyle(PokerTheme.ink)
-                Text("vs \(quiz.villainHand)  ·  Board \(quiz.board)")
-                    .font(.subheadline.monospaced())
-                    .foregroundStyle(PokerTheme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
+                HandQuizCardsLine(label: "Hero", cards: quiz.heroHand, tint: PokerTheme.felt)
+                HandQuizCardsLine(label: "Villain", cards: quiz.villainHand, tint: PokerTheme.coral)
+                HandQuizCardsLine(label: "公共牌", cards: quiz.board, tint: PokerTheme.ink, cardWidth: 30, cardHeight: 40)
             }
 
             HStack(spacing: 14) {
@@ -384,6 +383,33 @@ private struct HandQuizListView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
+        }
+    }
+}
+
+private struct HandQuizCardsLine: View {
+    let label: String
+    let cards: String
+    let tint: Color
+    var cardWidth: CGFloat = 34
+    var cardHeight: CGFloat = 46
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(label)
+                .font(.caption.weight(.black))
+                .foregroundStyle(tint)
+                .frame(width: 48, alignment: .leading)
+
+            PlayingCardsRow(
+                cardText: cards,
+                width: cardWidth,
+                height: cardHeight,
+                spacing: -6,
+                rotation: 2.5
+            )
+
+            Spacer(minLength: 0)
         }
     }
 }
