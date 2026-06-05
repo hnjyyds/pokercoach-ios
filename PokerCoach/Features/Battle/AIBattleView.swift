@@ -723,9 +723,7 @@ private struct LiveBattleView: View {
             AppOrientationController.lock(.landscapeRight)
         }
         .onChange(of: selectedSeat) { _, newValue in
-            Task {
-                await refreshBattle(observerSeat: newValue)
-            }
+            switchObservedSeat(to: newValue)
         }
         .task(id: snapshot?.id) {
             await autoplayBattle()
@@ -782,10 +780,20 @@ private struct LiveBattleView: View {
 
     private func refreshBattle(observerSeat: Int) async {
         guard let snapshot else { return }
-        if let next = await session.battleSnapshot(sessionId: snapshot.id, observerSeat: observerSeat) {
-            applySnapshot(next, preserveReplayCursor: true)
+        let next = await session.battleSnapshot(sessionId: snapshot.id, observerSeat: observerSeat)
+        guard observerSeat == selectedSeat else { return }
+        if let next {
+            applySnapshot(next, expectedObserverSeat: observerSeat, preserveReplayCursor: true)
         } else {
             presentBattleError(defaultMessage: "同步失败")
+        }
+    }
+
+    private func switchObservedSeat(to seat: Int) {
+        guard snapshot?.seats.contains(where: { $0.index == seat }) ?? agents.indices.contains(seat) else { return }
+        battleErrorMessage = nil
+        Task {
+            await refreshBattle(observerSeat: seat)
         }
     }
 
@@ -838,43 +846,60 @@ private struct LiveBattleView: View {
     }
 
     private func requestAdvance(from snapshot: BattleSessionSnapshot) async {
+        let observerSeat = selectedSeat
         if let next = await session.advanceBattle(
             sessionId: snapshot.id,
-            observerSeat: selectedSeat,
+            observerSeat: observerSeat,
             steps: 1
         ) {
-            applySnapshot(next)
+            guard observerSeat == selectedSeat else { return }
+            applySnapshot(next, expectedObserverSeat: observerSeat)
         } else {
+            guard observerSeat == selectedSeat else { return }
             presentBattleError(defaultMessage: "推进失败")
         }
     }
 
     private func requestNextHand(from snapshot: BattleSessionSnapshot) async {
-        if let next = await session.nextBattleHand(sessionId: snapshot.id, observerSeat: selectedSeat) {
-            applySnapshot(next)
+        let observerSeat = selectedSeat
+        if let next = await session.nextBattleHand(sessionId: snapshot.id, observerSeat: observerSeat) {
+            guard observerSeat == selectedSeat else { return }
+            applySnapshot(next, expectedObserverSeat: observerSeat)
         } else {
+            guard observerSeat == selectedSeat else { return }
             presentBattleError(defaultMessage: "下一手失败")
         }
     }
 
     private func submitPlayerAction(_ action: String, targetTotalBb: Double? = nil) async {
         guard let snapshot, !isAdvancing, isWaitingForPlayerAction else { return }
+        let observerSeat = selectedSeat
         isAdvancing = true
         defer { isAdvancing = false }
         if let next = await session.playerBattleAction(
             sessionId: snapshot.id,
-            observerSeat: selectedSeat,
+            observerSeat: observerSeat,
             action: action,
             targetTotalBb: targetTotalBb
         ) {
+            guard observerSeat == selectedSeat else { return }
             isAutoPlaying = !next.isSessionComplete
-            applySnapshot(next)
+            applySnapshot(next, expectedObserverSeat: observerSeat)
         } else {
+            guard observerSeat == selectedSeat else { return }
             presentBattleError(defaultMessage: "操作失败")
         }
     }
 
-    private func applySnapshot(_ next: BattleSessionSnapshot, preserveReplayCursor: Bool = false) {
+    private func applySnapshot(
+        _ next: BattleSessionSnapshot,
+        expectedObserverSeat: Int? = nil,
+        preserveReplayCursor: Bool = false
+    ) {
+        if let expectedObserverSeat, expectedObserverSeat != selectedSeat {
+            return
+        }
+
         let previousCursor = replayCursor
         let sameHand = snapshot?.id == next.id && snapshot?.handNumber == next.handNumber
         self.snapshot = next
@@ -892,8 +917,9 @@ private struct LiveBattleView: View {
             if next.isSessionComplete {
                 isAutoPlaying = false
             }
+            let observerSeat = selectedSeat
             Task {
-                await loadBattleHistory(sessionId: next.id, observerSeat: selectedSeat)
+                await loadBattleHistory(sessionId: next.id, observerSeat: observerSeat)
             }
         } else {
             handHistory = nil
@@ -907,11 +933,14 @@ private struct LiveBattleView: View {
 
     private func retryBattleRefresh() async {
         guard let snapshot, !isAdvancing else { return }
+        let observerSeat = selectedSeat
         battleErrorMessage = nil
         isAdvancing = true
         defer { isAdvancing = false }
-        if let next = await session.battleSnapshot(sessionId: snapshot.id, observerSeat: selectedSeat) {
-            applySnapshot(next, preserveReplayCursor: true)
+        let next = await session.battleSnapshot(sessionId: snapshot.id, observerSeat: observerSeat)
+        guard observerSeat == selectedSeat else { return }
+        if let next {
+            applySnapshot(next, expectedObserverSeat: observerSeat, preserveReplayCursor: true)
         } else {
             presentBattleError(defaultMessage: "恢复失败")
         }
@@ -930,6 +959,7 @@ private struct LiveBattleView: View {
         isLoadingHistory = true
         defer { isLoadingHistory = false }
         let nextHistory = await session.battleHistory(sessionId: sessionId, observerSeat: observerSeat)
+        guard observerSeat == selectedSeat else { return }
         if snapshot?.id == sessionId,
            snapshot?.handNumber == nextHistory?.handNumber,
            snapshot?.isComplete == true {
@@ -990,17 +1020,15 @@ private struct LiveBattleView: View {
 
                 playbackControls(compact: false)
 
-                if isWaitingForPlayerAction {
-                    PlayerActionDock(
-                        callAmount: playerCallAmount,
-                        raiseAmount: playerRaiseAmount,
-                        isBusy: isAdvancing,
-                        onAction: { action, target in
-                            Task { await submitPlayerAction(action, targetTotalBb: target) }
-                        }
-                    )
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
+                PlayerActionDockSlot(
+                    isVisible: isWaitingForPlayerAction,
+                    callAmount: playerCallAmount,
+                    raiseAmount: playerRaiseAmount,
+                    isBusy: isAdvancing,
+                    onAction: { action, target in
+                        Task { await submitPlayerAction(action, targetTotalBb: target) }
+                    }
+                )
 
                 BattleReplayStatusStrip(
                     event: focusedReplayEvent,
@@ -1061,6 +1089,15 @@ private struct LiveBattleView: View {
             )
             .frame(width: tableWidth, height: tableHeight, alignment: .topLeading)
             .offset(x: tableLeading, y: topInset)
+
+            LandscapeObserverPill(
+                agent: observerAgent,
+                position: observerPositionLabel,
+                isAutoPlaying: isAutoPlaying
+            )
+            .frame(width: min(260, tableWidth * 0.42))
+            .position(x: tableLeading + tableWidth * 0.50, y: topInset + 28)
+            .zIndex(18)
 
             landscapeRail
                 .frame(width: railWidth, height: tableHeight, alignment: .top)
@@ -1240,6 +1277,45 @@ private struct LandscapeMetricBadge: View {
     }
 }
 
+private struct LandscapeObserverPill: View {
+    let agent: BattleAgent
+    let position: String
+    let isAutoPlaying: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            AgentAvatarView(agent: agent, size: 30, isSelected: true, isActive: false)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("\(position) · \(agent.name)")
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(PokerTheme.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.74)
+
+                AgentStrategyGlyphRow(agent: agent, compact: true)
+            }
+
+            Spacer(minLength: 0)
+
+            Image(systemName: isAutoPlaying ? "play.fill" : "pause.fill")
+                .font(.system(size: 9, weight: .black))
+                .foregroundStyle(.white)
+                .frame(width: 22, height: 22)
+                .background(isAutoPlaying ? PokerTheme.felt : PokerTheme.muted, in: Circle())
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 6)
+        .background(.white.opacity(0.66), in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(.white.opacity(0.52), lineWidth: 1)
+        }
+        .shadow(color: agent.color.opacity(0.10), radius: 16, y: 8)
+        .accessibilityLabel("正在观战 \(position) \(agent.name)")
+    }
+}
+
 private struct LiveMetric: View {
     let icon: String
     let title: String
@@ -1308,6 +1384,30 @@ private struct PlayerActionDock: View {
         }
         .shadow(color: PokerTheme.ink.opacity(0.08), radius: 18, y: 9)
         .accessibilityElement(children: .contain)
+    }
+}
+
+private struct PlayerActionDockSlot: View {
+    let isVisible: Bool
+    let callAmount: Double
+    let raiseAmount: Double
+    let isBusy: Bool
+    let onAction: (String, Double?) -> Void
+
+    var body: some View {
+        PlayerActionDock(
+            callAmount: callAmount,
+            raiseAmount: raiseAmount,
+            isBusy: isBusy,
+            onAction: onAction
+        )
+        .opacity(isVisible ? 1 : 0)
+        .scaleEffect(isVisible ? 1 : 0.98)
+        .allowsHitTesting(isVisible)
+        .accessibilityHidden(!isVisible)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: 56, alignment: .center)
+        .animation(.spring(response: 0.28, dampingFraction: 0.86), value: isVisible)
     }
 }
 
@@ -1547,12 +1647,17 @@ private struct BattleTableEventChip: View {
 
     var body: some View {
         HStack(spacing: compact ? 0 : 5) {
-            Image(systemName: event.event.systemImage)
-                .font(.system(size: compact ? 12 : 9, weight: .black))
-                .foregroundStyle(.white)
-                .frame(width: compact ? 28 : 22, height: compact ? 28 : 22)
-                .background(event.event.tint, in: Circle())
-                .shadow(color: event.event.tint.opacity(0.16), radius: 9, y: 4)
+            if compact, !event.cards.isEmpty {
+                BattleMiniCardFan(codes: event.cards, compact: true)
+                    .frame(width: 32, height: 28)
+            } else {
+                Image(systemName: event.event.systemImage)
+                    .font(.system(size: compact ? 12 : 9, weight: .black))
+                    .foregroundStyle(.white)
+                    .frame(width: compact ? 28 : 22, height: compact ? 28 : 22)
+                    .background(event.event.tint, in: Circle())
+                    .shadow(color: event.event.tint.opacity(0.16), radius: 9, y: 4)
+            }
 
             if !compact {
                 Text(event.event.shortLabel)
@@ -1562,10 +1667,7 @@ private struct BattleTableEventChip: View {
                     .minimumScaleFactor(0.72)
 
                 if !event.cards.isEmpty {
-                    Text("\(event.cards.count)")
-                        .font(.system(size: 9, weight: .black, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(PokerTheme.muted)
+                    BattleMiniCardFan(codes: event.cards, compact: true)
                 }
             }
         }
@@ -1668,6 +1770,10 @@ private struct BattleReplayStatusStrip: View {
                     .foregroundStyle(PokerTheme.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.74)
+
+                if !event.cards.isEmpty {
+                    BattleMiniCardFan(codes: event.cards, compact: true)
+                }
 
                 Spacer(minLength: 0)
 
@@ -2173,38 +2279,29 @@ private struct LiveBattleTableView: View {
         seatPoint: CGPoint,
         size: CGSize
     ) -> CGPoint {
-        let contentSize = CGSize(width: 86, height: 34)
+        let contentSize = CGSize(width: 94, height: 38)
         let center = tableCenter(size: size)
         let radial = radialUnit(from: center, to: seatPoint)
-        let offset: CGSize
-        if seatSlot == 0 {
-            offset = CGSize(width: -96, height: -4)
-        } else if radial.dy < -0.74 {
-            offset = CGSize(width: radial.dx * 34, height: -58)
-        } else if radial.dy > 0.74 {
-            offset = CGSize(width: radial.dx * 34, height: 54)
+        let tangent = CGVector(dx: -radial.dy, dy: radial.dx)
+        let seatClearance: CGFloat = seatSlot == 0 ? 86 : 76
+        let horizontalBias: CGFloat
+
+        if abs(radial.dy) > 0.74 {
+            horizontalBias = radial.dx >= 0 ? -8 : 8
         } else {
-            offset = CGSize(width: radial.dx * 78, height: radial.dy * 48)
+            horizontalBias = 0
         }
+
+        let offset = CGSize(
+            width: radial.dx * seatClearance + tangent.dx * horizontalBias,
+            height: radial.dy * seatClearance + tangent.dy * horizontalBias
+        )
 
         return clampedPoint(
             CGPoint(x: seatPoint.x + offset.width, y: seatPoint.y + offset.height),
             size: size,
             contentSize: contentSize
         )
-    }
-
-    private func actionBubbleScore(
-        point: CGPoint,
-        seatPoint: CGPoint,
-        tableCenter: CGPoint,
-        contentSize: CGSize
-    ) -> CGFloat {
-        let overlapsSeat = abs(point.x - seatPoint.x) < contentSize.width / 2 + 36
-            && abs(point.y - seatPoint.y) < contentSize.height / 2 + 32
-        let outsideGain = pointDistance(point, tableCenter) - pointDistance(seatPoint, tableCenter)
-        let seatDistance = pointDistance(point, seatPoint)
-        return outsideGain * 3 + seatDistance - (overlapsSeat ? 400 : 0)
     }
 
     private func resultPoint(size: CGSize) -> CGPoint {
@@ -2240,12 +2337,6 @@ private struct LiveBattleTableView: View {
         let dy = point.y - center.y
         let length = max(sqrt(dx * dx + dy * dy), 1)
         return CGVector(dx: dx / length, dy: dy / length)
-    }
-
-    private func pointDistance(_ first: CGPoint, _ second: CGPoint) -> CGFloat {
-        let dx = first.x - second.x
-        let dy = first.y - second.y
-        return sqrt(dx * dx + dy * dy)
     }
 
     private func clampedPoint(
@@ -2365,6 +2456,11 @@ private struct PokerCardValue: Identifiable {
     let rank: String
     let suit: String
     let tint: Color
+
+    var fanRotationDegrees: Double {
+        let seed = id.unicodeScalars.reduce(0) { $0 + Int($1.value) }
+        return seed.isMultiple(of: 2) ? -5 : 5
+    }
 
     init(id: String, rank: String, suit: String, tint: Color) {
         self.id = id
@@ -2873,6 +2969,10 @@ private struct TableReplayPulseView: View {
                     .font(.system(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(PokerTheme.ink)
                     .lineLimit(1)
+
+                if !event.cards.isEmpty {
+                    BattleMiniCardFan(codes: event.cards, compact: true)
+                }
             }
             .padding(.horizontal, 9)
             .padding(.vertical, 6)
@@ -3052,7 +3152,7 @@ private struct ObservedHoleCardsView: View {
             HStack(spacing: -9) {
                 ForEach(cards) { card in
                     PlayingCardFace(rank: card.rank, suit: card.suit, tint: card.tint, width: 34, height: 45)
-                        .rotationEffect(.degrees(card.id.hashValue.isMultiple(of: 2) ? -5 : 5))
+                        .rotationEffect(.degrees(card.fanRotationDegrees))
                 }
             }
 
@@ -3064,6 +3164,39 @@ private struct ObservedHoleCardsView: View {
                 .offset(x: 6, y: -6)
         }
         .shadow(color: PokerTheme.ink.opacity(0.12), radius: 12, y: 7)
+    }
+}
+
+private struct BattleMiniCardFan: View {
+    let codes: [String]
+    var compact = false
+
+    private var cards: [PokerCardValue] {
+        codes.compactMap(PokerCardValue.init(code:))
+    }
+
+    var body: some View {
+        if !cards.isEmpty {
+            HStack(spacing: compact ? -7 : -8) {
+                ForEach(Array(cards.prefix(3).enumerated()), id: \.element.id) { index, card in
+                    PlayingCardFace(
+                        rank: card.rank,
+                        suit: card.suit,
+                        tint: card.tint,
+                        width: compact ? 18 : 24,
+                        height: compact ? 24 : 32
+                    )
+                    .rotationEffect(.degrees(rotation(for: index, card: card)))
+                }
+            }
+            .shadow(color: PokerTheme.ink.opacity(0.08), radius: compact ? 4 : 7, y: compact ? 2 : 4)
+            .accessibilityLabel("\(cards.count) 张扑克牌图形")
+        }
+    }
+
+    private func rotation(for index: Int, card: PokerCardValue) -> Double {
+        let base = [-6.0, 0, 6.0][index % 3]
+        return compact ? base * 0.72 : base + card.fanRotationDegrees * 0.25
     }
 }
 
@@ -3126,7 +3259,7 @@ private struct LiveSeatBadge: View {
             ZStack(alignment: .bottom) {
                 AgentAvatarView(
                     agent: agent,
-                    size: isActive ? 52 : 46,
+                    size: 50,
                     isSelected: isObserver,
                     isActive: isActive
                 )
@@ -3138,6 +3271,10 @@ private struct LiveSeatBadge: View {
                     tint: agent.color
                 )
                 .offset(y: 12)
+            }
+            .overlay(alignment: .topTrailing) {
+                SeatTapAffordance(isObserver: isObserver, tint: agent.color)
+                    .offset(x: 8, y: -1)
             }
             .padding(.bottom, 9)
 
@@ -3158,6 +3295,25 @@ private struct LiveSeatBadge: View {
         }
         .opacity(isFolded ? 0.52 : 1)
         .frame(width: 84, height: 92)
+    }
+}
+
+private struct SeatTapAffordance: View {
+    let isObserver: Bool
+    let tint: Color
+
+    var body: some View {
+        Image(systemName: isObserver ? "eye.fill" : "hand.tap")
+            .font(.system(size: 8, weight: .black))
+            .foregroundStyle(isObserver ? .white : tint)
+            .frame(width: 19, height: 19)
+            .background(isObserver ? PokerTheme.ink : .white.opacity(0.90), in: Circle())
+            .overlay {
+                Circle()
+                    .stroke(isObserver ? .white.opacity(0.46) : tint.opacity(0.18), lineWidth: 1)
+            }
+            .shadow(color: tint.opacity(isObserver ? 0.16 : 0.08), radius: 7, y: 4)
+            .accessibilityHidden(true)
     }
 }
 
@@ -3399,17 +3555,93 @@ private struct PlayingCardFace: View {
     var width: CGFloat = 36
     var height: CGFloat = 46
 
+    private var suitSystemImage: String {
+        switch suit {
+        case "♠":
+            "suit.spade.fill"
+        case "♥":
+            "suit.heart.fill"
+        case "♦":
+            "suit.diamond.fill"
+        case "♣":
+            "suit.club.fill"
+        default:
+            "suit.spade.fill"
+        }
+    }
+
+    private var cornerRadius: CGFloat {
+        min(width, height) * 0.18
+    }
+
+    private var showsCornerMarks: Bool {
+        width >= 30
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(.white.opacity(0.96))
+
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .stroke(tint.opacity(0.18), lineWidth: 0.8)
+
+            VStack(spacing: width >= 30 ? 1 : -1) {
+                Text(rank)
+                    .font(.system(size: width >= 30 ? 12 : 7, weight: .black, design: .rounded))
+                    .minimumScaleFactor(0.62)
+                    .lineLimit(1)
+
+                Image(systemName: suitSystemImage)
+                    .font(.system(size: width >= 30 ? 10 : 7, weight: .black))
+                    .symbolRenderingMode(.monochrome)
+            }
+            .foregroundStyle(tint)
+            .padding(.horizontal, width >= 30 ? 5 : 2)
+
+            if showsCornerMarks {
+                VStack {
+                    HStack {
+                        CardCornerMark(rank: rank, suitSystemImage: suitSystemImage, tint: tint)
+                        Spacer(minLength: 0)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    HStack {
+                        Spacer(minLength: 0)
+                        CardCornerMark(rank: rank, suitSystemImage: suitSystemImage, tint: tint)
+                            .rotationEffect(.degrees(180))
+                    }
+                }
+                .padding(4)
+            }
+        }
+        .frame(width: width, height: height)
+        .shadow(color: Color(hex: "#071226").opacity(0.08), radius: 8, y: 4)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("扑克牌图形")
+    }
+}
+
+private struct CardCornerMark: View {
+    let rank: String
+    let suitSystemImage: String
+    let tint: Color
+
+    var body: some View {
+        VStack(spacing: -1) {
             Text(rank)
-                .font(width > 34 ? .caption.weight(.black) : .caption2.weight(.black))
-            Text(suit)
-                .font(.caption2.weight(.black))
+                .font(.system(size: 5.5, weight: .black, design: .rounded))
+                .minimumScaleFactor(0.58)
+                .lineLimit(1)
+
+            Image(systemName: suitSystemImage)
+                .font(.system(size: 4.8, weight: .black))
+                .symbolRenderingMode(.monochrome)
         }
         .foregroundStyle(tint)
-        .frame(width: width, height: height)
-        .background(.white.opacity(0.95), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-        .shadow(color: Color(hex: "#071226").opacity(0.08), radius: 8, y: 4)
+        .frame(width: 9)
     }
 }
 

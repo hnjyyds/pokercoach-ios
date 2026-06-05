@@ -91,10 +91,12 @@ struct HomeView: View {
                         .rotationEffect(.degrees(isModuleProgressExpanded ? 180 : 0))
                         .frame(width: 28, height: 28)
                 }
-                .contentShape(Rectangle())
+                .padding(.vertical, 6)
+                .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .buttonStyle(.plain)
             .accessibilityLabel(isModuleProgressExpanded ? "收起模块进度" : "展开模块进度")
+            .accessibilityValue(isModuleProgressExpanded ? "已展开" : "已收起")
 
             if isModuleProgressExpanded {
                 ForEach(plan.modules) { module in
@@ -127,10 +129,12 @@ struct HomeView: View {
                             .frame(width: 28, height: 28)
                     }
                 }
-                .contentShape(Rectangle())
+                .padding(.vertical, 6)
+                .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .buttonStyle(.plain)
             .accessibilityLabel(isMistakesExpanded ? "收起最近错题" : "展开最近错题")
+            .accessibilityValue(isMistakesExpanded ? "已展开" : "已收起")
 
             if isMistakesExpanded {
                 if mistakes.isEmpty {
@@ -144,7 +148,8 @@ struct HomeView: View {
                         } label: {
                             MistakeRow(index: index, mistake: mistake)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(HomeRowButtonStyle())
+                        .accessibilityLabel("\(mistakeDisplayTitle(mistake))，你\(mistake.userActionLabel)，建议\(mistake.recommendedActionLabel)，损失 \(bb(abs(mistake.evDeltaBb)))")
                         .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                 }
@@ -175,6 +180,8 @@ private struct HomeSectionHeader<Trailing: View>: View {
             Text(title)
                 .font(.title3.weight(.black))
                 .foregroundStyle(PokerTheme.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
 
             Spacer(minLength: 0)
 
@@ -366,16 +373,21 @@ private struct ModuleRow: View {
                     Text(module.title)
                         .font(.subheadline.weight(.black))
                         .foregroundStyle(PokerTheme.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
                     Spacer()
                     Text("\(Int(module.progress * 100))%")
                         .font(.caption.monospacedDigit().weight(.bold))
                         .foregroundStyle(PokerTheme.muted)
+                        .lineLimit(1)
                 }
                 ProgressView(value: module.progress)
                     .tint(Color(hex: module.accent))
             }
         }
         .padding(.vertical, 8)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(module.title)，进度 \(Int(module.progress * 100))%")
     }
 }
 
@@ -403,20 +415,16 @@ private struct MistakeRow: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
 
-                HStack(spacing: 8) {
-                    PlayingCardsRow(
-                        cardCodes: mistake.heroCards,
-                        width: 24,
-                        height: 32,
-                        spacing: -5,
-                        rotation: 2
-                    )
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) {
+                        mistakeCards
+                        actionText
+                    }
 
-                    Text("你\(mistake.userActionLabel) · 应\(mistake.recommendedActionLabel)")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(PokerTheme.muted)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
+                    VStack(alignment: .leading, spacing: 4) {
+                        mistakeCards
+                        actionText
+                    }
                 }
             }
 
@@ -431,7 +439,36 @@ private struct MistakeRow: View {
                 .foregroundStyle(PokerTheme.muted)
         }
         .padding(.vertical, 5)
+        .frame(minHeight: 58)
         .contentShape(Rectangle())
+    }
+
+    private var mistakeCards: some View {
+        PlayingCardsRow(
+            cardCodes: mistake.heroCards,
+            width: 24,
+            height: 32,
+            spacing: -5,
+            rotation: 2
+        )
+    }
+
+    private var actionText: some View {
+        Text("你\(mistake.userActionLabel) · 应\(mistake.recommendedActionLabel)")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(PokerTheme.muted)
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
+    }
+}
+
+private struct HomeRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.horizontal, 8)
+            .background(PokerTheme.ink.opacity(configuration.isPressed ? 0.05 : 0), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .animation(.spring(response: 0.24, dampingFraction: 0.78), value: configuration.isPressed)
     }
 }
 
@@ -506,6 +543,7 @@ private struct MistakeReviewView: View {
                             .background(.white.opacity(0.74), in: Circle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("关闭复盘")
                 }
             }
             .task(id: summary.id) {
@@ -526,26 +564,46 @@ private struct MistakeReviewView: View {
     }
 
     private func actionCompare(_ detail: BattleMistakeDetail) -> some View {
-        HStack(spacing: 12) {
-            ReviewActionPill(
-                title: "你的动作",
-                action: detail.userActionLabel,
-                amount: bb(detail.userTotalBb),
-                icon: "xmark.circle.fill",
-                tint: PokerTheme.coral
-            )
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                ReviewActionPill(
+                    title: "你的动作",
+                    action: detail.userActionLabel,
+                    amount: bb(detail.userTotalBb),
+                    icon: "xmark.circle.fill",
+                    tint: PokerTheme.coral
+                )
 
-            Image(systemName: "arrow.right")
-                .font(.headline.weight(.black))
-                .foregroundStyle(PokerTheme.muted)
+                Image(systemName: "arrow.right")
+                    .font(.headline.weight(.black))
+                    .foregroundStyle(PokerTheme.muted)
 
-            ReviewActionPill(
-                title: "建议动作",
-                action: detail.recommendedActionLabel,
-                amount: bb(detail.recommendedTotalBb),
-                icon: "checkmark.seal.fill",
-                tint: PokerTheme.felt
-            )
+                ReviewActionPill(
+                    title: "建议动作",
+                    action: detail.recommendedActionLabel,
+                    amount: bb(detail.recommendedTotalBb),
+                    icon: "checkmark.seal.fill",
+                    tint: PokerTheme.felt
+                )
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                ReviewActionPill(
+                    title: "你的动作",
+                    action: detail.userActionLabel,
+                    amount: bb(detail.userTotalBb),
+                    icon: "xmark.circle.fill",
+                    tint: PokerTheme.coral
+                )
+
+                ReviewActionPill(
+                    title: "建议动作",
+                    action: detail.recommendedActionLabel,
+                    amount: bb(detail.recommendedTotalBb),
+                    icon: "checkmark.seal.fill",
+                    tint: PokerTheme.felt
+                )
+            }
         }
     }
 
@@ -619,6 +677,7 @@ private struct MistakeReviewView: View {
             .shadow(color: PokerTheme.ink.opacity(0.18), radius: 12, y: 7)
             .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending)
             .opacity(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.55 : 1)
+            .accessibilityLabel("发送复盘问题")
         }
         .padding(.horizontal, 18)
         .padding(.top, 10)
@@ -759,16 +818,20 @@ private struct ReviewCandidateRow: View {
                 Text(candidate.label)
                     .font(.headline.weight(.black))
                     .foregroundStyle(PokerTheme.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
 
                 Text(bb(candidate.targetTotalBb))
                     .font(.caption.monospacedDigit().weight(.black))
                     .foregroundStyle(PokerTheme.muted)
+                    .lineLimit(1)
 
                 Spacer(minLength: 0)
 
                 Text("\(candidate.evBb, specifier: "%+.1f")BB")
                     .font(.caption.monospacedDigit().weight(.black))
                     .foregroundStyle(candidate.evBb >= 0 ? PokerTheme.felt : PokerTheme.coral)
+                    .lineLimit(1)
             }
 
             Text(candidate.reason)
@@ -846,9 +909,12 @@ private struct ReviewMetric: View {
                 Text(value)
                     .font(.headline.monospacedDigit().weight(.black))
                     .foregroundStyle(PokerTheme.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
                 Text(title)
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(PokerTheme.muted)
+                    .lineLimit(1)
             }
         }
     }
@@ -865,9 +931,11 @@ private struct SeatContextChip: View {
             Text("\(seat.position) \(seat.name)")
                 .font(.caption.weight(.black))
                 .foregroundStyle(PokerTheme.ink)
+                .lineLimit(1)
             Text(bb(seat.stackBb))
                 .font(.caption2.monospacedDigit().weight(.bold))
                 .foregroundStyle(PokerTheme.muted)
+                .lineLimit(1)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)

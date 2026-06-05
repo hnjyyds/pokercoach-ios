@@ -48,7 +48,9 @@ struct TrainingView: View {
             } label: {
                 TrainingSegmentButton(title: "情景题", icon: "target", isSelected: selectedSegment == 0)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(TrainingPressButtonStyle())
+            .accessibilityLabel("情景题")
+            .accessibilityValue(selectedSegment == 0 ? "已选择" : "未选择")
 
             Button {
                 withAnimation(.spring(response: 0.38, dampingFraction: 0.84)) {
@@ -57,7 +59,9 @@ struct TrainingView: View {
             } label: {
                 TrainingSegmentButton(title: "牌力", icon: "suit.spade.fill", isSelected: selectedSegment == 1)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(TrainingPressButtonStyle())
+            .accessibilityLabel("牌力")
+            .accessibilityValue(selectedSegment == 1 ? "已选择" : "未选择")
 
             Spacer(minLength: 0)
         }
@@ -84,6 +88,8 @@ private struct TrainingSegmentButton: View {
                 .offset(y: 8)
         }
         .padding(.vertical, 8)
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
     }
 }
 
@@ -198,7 +204,9 @@ private struct PreflopTrainerView: View {
                     } label: {
                         ActionOptionButton(choice: choice, isSelected: selectedAction == choice.action)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(TrainingPressButtonStyle())
+                    .accessibilityLabel(choiceAccessibilityLabel(choice))
+                    .accessibilityValue(selectedAction == choice.action ? "已选择" : "未选择")
                     .frame(maxWidth: .infinity)
                 }
             }
@@ -219,6 +227,7 @@ private struct PreflopTrainerView: View {
             .buttonStyle(PrimaryButtonStyle())
             .disabled(selectedAction == nil || isSubmitting)
             .opacity(selectedAction == nil ? 0.55 : 1)
+            .accessibilityLabel("提交你的行动")
         }
     }
 
@@ -233,6 +242,7 @@ private struct PreflopTrainerView: View {
                 Text("推荐：\(result.recommendation)")
                     .font(.subheadline.weight(.black))
                     .foregroundStyle(PokerTheme.ink)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Text(result.explanation)
                     .font(.subheadline)
@@ -262,6 +272,8 @@ private struct PreflopTrainerView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(PokerTheme.muted)
+            .frame(minHeight: 44)
+            .accessibilityLabel("上一题")
 
             Button {
                 move(by: 1)
@@ -270,6 +282,8 @@ private struct PreflopTrainerView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(PokerTheme.ink)
+            .frame(minHeight: 44)
+            .accessibilityLabel("下一题")
         }
         .font(.headline.weight(.black))
         .padding(.top, 2)
@@ -287,6 +301,13 @@ private struct PreflopTrainerView: View {
         index = (index + delta + session.scenarios.count) % session.scenarios.count
         selectedAction = nil
         result = nil
+    }
+
+    private func choiceAccessibilityLabel(_ choice: Choice) -> String {
+        if let sizing = choice.sizing {
+            return "\(choice.label)，\(sizing)"
+        }
+        return choice.label
     }
 }
 
@@ -322,6 +343,10 @@ private struct ActionOptionButton: View {
             }
         }
         .frame(minHeight: 104, alignment: .top)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(PokerTheme.ink.opacity(isSelected ? 0.06 : 0), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 
@@ -371,7 +396,9 @@ private struct HandQuizListView: View {
                             isCorrect: option == quiz.answer
                         )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(TrainingPressButtonStyle())
+                    .accessibilityLabel(option)
+                    .accessibilityValue(selectedAnswers[quiz.id] == option ? "已选择" : "未选择")
                     .frame(maxWidth: .infinity)
                 }
             }
@@ -400,6 +427,7 @@ private struct HandQuizCardsLine: View {
                 .font(.caption.weight(.black))
                 .foregroundStyle(tint)
                 .frame(width: 48, alignment: .leading)
+                .lineLimit(1)
 
             PlayingCardsRow(
                 cardText: cards,
@@ -430,6 +458,19 @@ private struct QuizOptionButton: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
         }
+        .padding(.vertical, 10)
+        .frame(minHeight: 64)
+        .frame(maxWidth: .infinity)
+        .background(PokerTheme.ink.opacity(isSelected ? 0.06 : 0), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+private struct TrainingPressButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.975 : 1)
+            .animation(.spring(response: 0.23, dampingFraction: 0.78), value: configuration.isPressed)
     }
 }
 

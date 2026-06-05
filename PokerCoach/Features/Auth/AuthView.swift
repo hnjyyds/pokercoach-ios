@@ -56,7 +56,7 @@ struct AuthView: View {
             HStack(spacing: 8) {
                 Image(systemName: "sparkles")
                     .font(.caption.weight(.black))
-                Text("打造你的德州扑克 AI 训练团队")
+                Text("德州扑克 AI 训练")
                     .font(.caption.weight(.black))
             }
             .foregroundStyle(Color(hex: "#071226"))
@@ -146,6 +146,7 @@ struct AuthView: View {
             .disabled(session.isLoading || !canSubmit)
             .opacity(canSubmit ? 1 : 0.48)
             .animation(.easeInOut(duration: 0.2), value: canSubmit)
+            .accessibilityLabel(mode == .login ? "开始训练" : "创建档案")
 
         }
         .padding(.horizontal, 2)
@@ -508,10 +509,10 @@ private enum WorkbenchModule: String, CaseIterable, Identifiable {
         }
     }
 
-    var scenarioHandClass: String? {
+    var scenarioCardCodes: [String] {
         switch self {
-        case .preflop: "AKo"
-        default: nil
+        case .preflop: ["As", "Kh"]
+        default: []
         }
     }
 
@@ -713,9 +714,13 @@ private struct ModuleDock: View {
                             Text(module.title)
                                 .font(.caption2.weight(.black))
                                 .foregroundStyle(Color(hex: "#071226"))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.82)
                             Text(module.subtitle)
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(Color(hex: "#8A94A6"))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.82)
                         }
 
                         Spacer(minLength: 0)
@@ -729,6 +734,7 @@ private struct ModuleDock: View {
                 }
                 .buttonStyle(PreviewPressButtonStyle())
                 .accessibilityLabel(module.title)
+                .accessibilityValue(selectedModule == module ? "已选择" : "未选择")
             }
         }
         .padding(10)
@@ -780,9 +786,9 @@ private struct CoachPreviewCard: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
 
-                if let handClass = module.scenarioHandClass {
+                if !module.scenarioCardCodes.isEmpty {
                     PlayingCardsRow(
-                        handClass: handClass,
+                        cardCodes: module.scenarioCardCodes,
                         width: 24,
                         height: 32,
                         spacing: -5,
@@ -859,6 +865,7 @@ private struct StatusPreviewButton: View {
         }
         .buttonStyle(PreviewPressButtonStyle())
         .accessibilityLabel(status.title)
+        .accessibilityValue(isActive ? "已选择" : "未选择")
     }
 }
 
@@ -925,6 +932,8 @@ private struct AuthModeSwitch: View {
                         }
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(mode.rawValue)
+                .accessibilityValue(selection == mode ? "已选择" : "未选择")
             }
         }
         .padding(4)
@@ -962,6 +971,7 @@ private struct AuthInputField: View {
             .pokerNoAutocapitalization()
             .autocorrectionDisabled()
             .textInputAutocapitalization(.never)
+            .accessibilityLabel(placeholder)
         }
         .padding(.horizontal, 14)
         .frame(height: 48)

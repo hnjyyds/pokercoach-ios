@@ -43,7 +43,7 @@ struct OddsCalculatorView: View {
     private var inputSurface: some View {
         VStack(alignment: .leading, spacing: 18) {
             FreeformInput(icon: "suit.spade.fill", placeholder: "输入手牌", text: $heroHand)
-            FreeformInput(icon: "tablecells.fill", placeholder: "输入公共牌", text: $board)
+            FreeformInput(icon: "tablecells.fill", placeholder: "输入公共牌", text: $board, cardWidth: 31, cardHeight: 42)
 
             HStack(spacing: 18) {
                 Image(systemName: "scope")
@@ -69,6 +69,7 @@ struct OddsCalculatorView: View {
                             .font(.headline.weight(.black))
                     }
                     .buttonStyle(OddsRoundButtonStyle())
+                    .accessibilityLabel("减少 Outs")
 
                     Button {
                         outs = min(20, outs + 1)
@@ -77,8 +78,12 @@ struct OddsCalculatorView: View {
                             .font(.headline.weight(.black))
                     }
                     .buttonStyle(OddsRoundButtonStyle(tint: PokerTheme.ink))
+                    .accessibilityLabel("增加 Outs")
                 }
             }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Outs")
+            .accessibilityValue("\(outs)")
 
             Button {
                 Task { await calculate() }
@@ -94,6 +99,7 @@ struct OddsCalculatorView: View {
                 }
             }
             .buttonStyle(PrimaryButtonStyle())
+            .accessibilityLabel("计算权益")
         }
     }
 
@@ -163,18 +169,46 @@ private struct FreeformInput: View {
     let icon: String
     let placeholder: String
     @Binding var text: String
+    var cardWidth: CGFloat = 35
+    var cardHeight: CGFloat = 47
+
+    private var hasPreview: Bool {
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.headline.weight(.black))
-                .foregroundStyle(PokerTheme.muted)
-                .frame(width: 26)
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.headline.weight(.black))
+                    .foregroundStyle(PokerTheme.muted)
+                    .frame(width: 26)
 
-            TextField(placeholder, text: $text)
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(PokerTheme.ink)
-                .pokerCharactersAutocapitalization()
+                TextField(placeholder, text: $text)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(PokerTheme.ink)
+                    .pokerCharactersAutocapitalization()
+                    .textFieldStyle(.plain)
+                    .accessibilityLabel(placeholder)
+            }
+
+            if hasPreview {
+                HStack(spacing: 12) {
+                    Color.clear
+                        .frame(width: 26, height: 1)
+
+                    PlayingCardsRow(
+                        cardText: text,
+                        width: cardWidth,
+                        height: cardHeight,
+                        spacing: -6,
+                        rotation: 2
+                    )
+
+                    Spacer(minLength: 0)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
         .padding(.vertical, 10)
         .overlay(alignment: .bottom) {
@@ -182,6 +216,7 @@ private struct FreeformInput: View {
                 .fill(Color(hex: "#D9E2ED").opacity(0.90))
                 .frame(height: 1)
         }
+        .animation(.spring(response: 0.28, dampingFraction: 0.86), value: hasPreview)
     }
 }
 

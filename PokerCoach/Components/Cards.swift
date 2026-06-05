@@ -372,6 +372,12 @@ struct PlayingCardsRow: View {
                     .rotationEffect(.degrees(rotation(for: index)))
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilitySummary)
+    }
+
+    private var accessibilitySummary: String {
+        cards.isEmpty ? "扑克牌图形" : "\(cards.count) 张扑克牌图形"
     }
 
     private func rotation(for index: Int) -> Double {
@@ -414,7 +420,60 @@ struct PlayingCardToken: View {
                 .stroke(.white.opacity(0.86), lineWidth: 1)
         }
         .shadow(color: Color(hex: "#071226").opacity(0.08), radius: 10, y: 5)
-        .accessibilityLabel("扑克牌")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("扑克牌图形")
+    }
+}
+
+struct MiniCardFan: View {
+    let codes: [String]
+    var compact = false
+
+    private var visibleCodes: [String] {
+        Array(codes.prefix(compact ? 3 : 5))
+    }
+
+    var body: some View {
+        HStack(spacing: compact ? -5 : -6) {
+            ForEach(Array(visibleCodes.enumerated()), id: \.offset) { index, code in
+                MiniPlayingCardToken(code: code, compact: compact)
+                    .rotationEffect(.degrees(index.isMultiple(of: 2) ? -3 : 3))
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilitySummary)
+    }
+
+    private var accessibilitySummary: String {
+        visibleCodes.isEmpty ? "扑克牌图形" : "\(visibleCodes.count) 张扑克牌图形"
+    }
+}
+
+private struct MiniPlayingCardToken: View {
+    let code: String
+    let compact: Bool
+
+    var body: some View {
+        let card = CardVisualValue(code: code)
+        let width: CGFloat = compact ? 13 : 17
+        let height: CGFloat = compact ? 18 : 24
+
+        VStack(spacing: 0) {
+            Text(card.rank)
+                .font(.system(size: compact ? 7 : 9, weight: .black, design: .rounded))
+            Text(card.suit)
+                .font(.system(size: compact ? 6 : 8, weight: .black, design: .rounded))
+        }
+        .foregroundStyle(card.tint)
+        .frame(width: width, height: height)
+        .background(.white.opacity(0.96), in: RoundedRectangle(cornerRadius: compact ? 4 : 5, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: compact ? 4 : 5, style: .continuous)
+                .stroke(.white.opacity(0.86), lineWidth: 0.7)
+        }
+        .shadow(color: Color(hex: "#071226").opacity(0.08), radius: compact ? 5 : 7, y: compact ? 2 : 3)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("扑克牌图形")
     }
 }
 
@@ -422,35 +481,43 @@ private struct CardVisualValue {
     let rank: String
     let suit: String
     let tint: Color
+    let accessibilityLabel: String
 
     init(code: String) {
         let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalized = trimmed.replacingOccurrences(of: "10", with: "T").uppercased()
         let rankCode = String(normalized.dropLast())
         let suitCode = normalized.suffix(1).lowercased()
+        let suitName: String
 
         rank = rankCode == "T" ? "10" : (rankCode.isEmpty ? "?" : rankCode)
         switch suitCode {
         case "h":
             suit = "♥"
             tint = PokerTheme.coral
+            suitName = "红桃"
         case "d":
             suit = "♦"
             tint = PokerTheme.coral
+            suitName = "方片"
         case "c":
             suit = "♣"
             tint = PokerTheme.ink
+            suitName = "梅花"
         default:
             suit = "♠"
             tint = PokerTheme.ink
+            suitName = "黑桃"
         }
+        accessibilityLabel = "\(rank) \(suitName)"
     }
 
     static func codes(fromCardText text: String) -> [String] {
-        text
-            .split(whereSeparator: { $0.isWhitespace || $0 == "," || $0 == "|" || $0 == "/" })
-            .map(String.init)
-            .filter { $0.count >= 2 }
+        let parsedCodes = explicitCodes(from: normalizedCardText(text))
+        if !parsedCodes.isEmpty {
+            return parsedCodes
+        }
+        return codes(fromHandClass: text)
     }
 
     static func codes(fromHandClass handClass: String) -> [String] {
@@ -467,5 +534,35 @@ private struct CardVisualValue {
             return ["\(first)s", "\(second)s"]
         }
         return ["\(first)s", "\(second)h"]
+    }
+
+    private static func normalizedCardText(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "10", with: "T")
+            .replacingOccurrences(of: "♠", with: "s")
+            .replacingOccurrences(of: "♥", with: "h")
+            .replacingOccurrences(of: "♦", with: "d")
+            .replacingOccurrences(of: "♣", with: "c")
+            .uppercased()
+    }
+
+    private static func explicitCodes(from text: String) -> [String] {
+        var codes: [String] = []
+        var pendingRank: Character?
+
+        for character in text {
+            if "23456789TJQKA".contains(character) {
+                pendingRank = character
+                continue
+            }
+
+            if "SHDC".contains(character), let rank = pendingRank {
+                codes.append("\(rank)\(String(character).lowercased())")
+            }
+
+            pendingRank = nil
+        }
+
+        return codes
     }
 }
