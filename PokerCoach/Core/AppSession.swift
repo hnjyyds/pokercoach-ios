@@ -11,6 +11,7 @@ final class AppSession {
     var dashboard: DashboardResponse?
     var scenarios: [PreflopScenario] = []
     var handQuizzes: [HandQuiz] = []
+    var mistakeSummaries: [BattleMistakeSummary] = []
     var isLoading = false
     var errorMessage: String?
     var usesOfflineMock = false
@@ -45,6 +46,7 @@ final class AppSession {
         dashboard = MockFixtures.dashboard
         scenarios = MockFixtures.scenarios
         handQuizzes = MockFixtures.handQuizzes
+        mistakeSummaries = MockFixtures.mistakes
         usesOfflineMock = true
         errorMessage = nil
     }
@@ -55,6 +57,7 @@ final class AppSession {
         dashboard = nil
         scenarios = []
         handQuizzes = []
+        mistakeSummaries = []
         usesOfflineMock = false
         errorMessage = nil
     }
@@ -65,6 +68,7 @@ final class AppSession {
             dashboard = MockFixtures.dashboard
             scenarios = MockFixtures.scenarios
             handQuizzes = MockFixtures.handQuizzes
+            mistakeSummaries = MockFixtures.mistakes
             return
         }
 
@@ -76,12 +80,55 @@ final class AppSession {
             dashboard = try await apiClient.dashboard(token: token)
             scenarios = try await apiClient.preflopScenarios(token: token)
             handQuizzes = try await apiClient.handQuizzes(token: token)
+            mistakeSummaries = try await apiClient.mistakes(token: token)
         } catch {
             errorMessage = error.localizedDescription
             dashboard = MockFixtures.dashboard
             scenarios = MockFixtures.scenarios
             handQuizzes = MockFixtures.handQuizzes
+            mistakeSummaries = MockFixtures.mistakes
             usesOfflineMock = true
+        }
+    }
+
+    func loadMistakes() async {
+        guard let token, !usesOfflineMock else {
+            mistakeSummaries = MockFixtures.mistakes
+            return
+        }
+
+        do {
+            mistakeSummaries = try await apiClient.mistakes(token: token)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func mistakeDetail(id: String) async -> BattleMistakeDetail? {
+        guard let token, !usesOfflineMock else {
+            return MockFixtures.mistakeDetails.first { $0.id == id } ?? MockFixtures.mistakeDetails.first
+        }
+
+        do {
+            return try await apiClient.mistakeDetail(id: id, token: token)
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
+    func coachMistake(id: String, message: String) async -> BattleMistakeDetail? {
+        guard let token, !usesOfflineMock else {
+            return MockFixtures.reply(to: id, message: message)
+        }
+
+        do {
+            let detail = try await apiClient.coachMistake(id: id, message: message, token: token)
+            await loadMistakes()
+            return detail
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
         }
     }
 

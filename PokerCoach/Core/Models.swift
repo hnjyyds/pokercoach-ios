@@ -145,6 +145,102 @@ struct OddsResponse: Codable, Hashable {
     let isMock: Bool
 }
 
+struct BattleMistakeSummary: Codable, Identifiable, Hashable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let street: String
+    let position: String
+    let heroCards: [String]
+    let board: [String]
+    let userActionLabel: String
+    let recommendedActionLabel: String
+    let evDeltaBb: Double
+    let icon: String
+    let accent: String
+    let createdAt: String
+}
+
+struct BattleMistakeDetail: Codable, Identifiable, Hashable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let street: String
+    let position: String
+    let heroCards: [String]
+    let board: [String]
+    let userActionLabel: String
+    let recommendedActionLabel: String
+    let evDeltaBb: Double
+    let icon: String
+    let accent: String
+    let createdAt: String
+    let ownerId: String
+    let sessionId: String
+    let handNumber: Int
+    let actionId: String?
+    let userAction: String
+    let recommendedAction: String
+    let userTotalBb: Double
+    let recommendedTotalBb: Double
+    let scenario: BattleMistakeScenario
+    let candidates: [BattleMistakeCandidate]
+    let whyWrong: String
+    let correctPlay: String
+    let coachMessages: [CoachMessageSnapshot]
+}
+
+struct BattleMistakeCandidate: Codable, Identifiable, Hashable {
+    var id: String { "\(action)-\(targetTotalBb)-\(evBb)" }
+    let action: String
+    let label: String
+    let targetTotalBb: Double
+    let evBb: Double
+    let weight: Double
+    let isRecommended: Bool
+    let reason: String
+}
+
+struct BattleMistakeScenario: Codable, Hashable {
+    let sessionId: String
+    let handNumber: Int
+    let tableSize: Int
+    let street: String
+    let position: String
+    let heroName: String
+    let heroCards: [String]
+    let board: [String]
+    let potBb: Double
+    let currentBetBb: Double
+    let stackBb: Double
+    let committedBb: Double
+    let spr: Double
+    let tableSeats: [BattleMistakeTableSeat]
+    let tags: [String]
+}
+
+struct BattleMistakeTableSeat: Codable, Identifiable, Hashable {
+    var id: Int { seatIndex }
+    let seatIndex: Int
+    let position: String
+    let name: String
+    let stackBb: Double
+    let committedBb: Double
+    let status: String
+    let isHero: Bool
+}
+
+struct CoachMessageSnapshot: Codable, Identifiable, Hashable {
+    let id: String
+    let role: String
+    let content: String
+    let createdAt: String
+}
+
+struct CoachMessageRequestBody: Encodable {
+    let message: String
+}
+
 enum BattleStreet: String, Codable, Hashable {
     case preflop
     case flop

@@ -30,6 +30,130 @@ enum MockFixtures {
         nextDrillId: "pf_001"
     )
 
+    static var mistakes: [BattleMistakeSummary] {
+        mistakeDetails.map(summary)
+    }
+
+    static let mistakeDetails: [BattleMistakeDetail] = [
+        BattleMistakeDetail(
+            id: "seed_usr_demo_utg_kqo",
+            title: "KQo 面对 UTG 加注",
+            subtitle: "CO · Preflop · 反向隐含赔率",
+            street: "preflop",
+            position: "CO",
+            heroCards: ["Kc", "Qd"],
+            board: [],
+            userActionLabel: "跟注",
+            recommendedActionLabel: "弃牌",
+            evDeltaBb: 1.1,
+            icon: "suit.club.fill",
+            accent: "#F59E0B",
+            createdAt: "2026-06-05T00:00:00+00:00",
+            ownerId: "usr_demo",
+            sessionId: "seed_session",
+            handNumber: 1,
+            actionId: nil,
+            userAction: "call",
+            recommendedAction: "fold",
+            userTotalBb: 2.5,
+            recommendedTotalBb: 0,
+            scenario: BattleMistakeScenario(
+                sessionId: "seed_session",
+                handNumber: 1,
+                tableSize: 6,
+                street: "preflop",
+                position: "CO",
+                heroName: "Alex",
+                heroCards: ["Kc", "Qd"],
+                board: [],
+                potBb: 4,
+                currentBetBb: 2.5,
+                stackBb: 100,
+                committedBb: 0,
+                spr: 25,
+                tableSeats: [
+                    BattleMistakeTableSeat(seatIndex: 3, position: "UTG", name: "River", stackBb: 98, committedBb: 2.5, status: "active", isHero: false),
+                    BattleMistakeTableSeat(seatIndex: 5, position: "CO", name: "Alex", stackBb: 100, committedBb: 0, status: "active", isHero: true)
+                ],
+                tags: ["CO", "KQo", "被主导", "高SPR"]
+            ),
+            candidates: [
+                BattleMistakeCandidate(action: "fold", label: "弃牌", targetTotalBb: 0, evBb: 0.2, weight: 0.55, isRecommended: true, reason: "UTG 范围强，KQo 容易被 AQ/AK/KQs 主导。"),
+                BattleMistakeCandidate(action: "call", label: "跟注", targetTotalBb: 2.5, evBb: -0.9, weight: 0.30, isRecommended: false, reason: "高 SPR 下反向隐含赔率变大，翻后容易支付强牌。"),
+                BattleMistakeCandidate(action: "raise", label: "3-bet", targetTotalBb: 8, evBb: -0.3, weight: 0.15, isRecommended: false, reason: "阻断不足，面对 4-bet 难继续。")
+            ],
+            whyWrong: "KQo 看起来像高张强牌，但面对 UTG 紧范围，经常被 AK、AQ、QQ+ 主导；深筹码时跟注会把自己带进难打的大底池。",
+            correctPlay: "新手阶段直接弃牌，保留筹码进入位置更好、范围更清晰的 spot。",
+            coachMessages: [
+                CoachMessageSnapshot(
+                    id: "seed_msg_utg_1",
+                    role: "agent",
+                    content: "这手重点不是 KQ 漂亮，而是 UTG 范围太强。先把被主导风险排除，会少输很多大底池。",
+                    createdAt: "2026-06-05T00:00:00+00:00"
+                )
+            ]
+        ),
+        BattleMistakeDetail(
+            id: "seed_usr_demo_sb_defense",
+            title: "小盲位宽跟注",
+            subtitle: "SB · Preflop · 位置劣势",
+            street: "preflop",
+            position: "SB",
+            heroCards: ["Qh", "8h"],
+            board: [],
+            userActionLabel: "跟注",
+            recommendedActionLabel: "弃牌",
+            evDeltaBb: 0.8,
+            icon: "location.fill",
+            accent: "#EF4444",
+            createdAt: "2026-06-04T00:00:00+00:00",
+            ownerId: "usr_demo",
+            sessionId: "seed_session",
+            handNumber: 2,
+            actionId: nil,
+            userAction: "call",
+            recommendedAction: "fold",
+            userTotalBb: 2.5,
+            recommendedTotalBb: 0.5,
+            scenario: BattleMistakeScenario(
+                sessionId: "seed_session",
+                handNumber: 2,
+                tableSize: 6,
+                street: "preflop",
+                position: "SB",
+                heroName: "Alex",
+                heroCards: ["Qh", "8h"],
+                board: [],
+                potBb: 4,
+                currentBetBb: 2.5,
+                stackBb: 99.5,
+                committedBb: 0.5,
+                spr: 24.9,
+                tableSeats: [
+                    BattleMistakeTableSeat(seatIndex: 0, position: "BTN", name: "Nova", stackBb: 97.5, committedBb: 2.5, status: "active", isHero: false),
+                    BattleMistakeTableSeat(seatIndex: 1, position: "SB", name: "Alex", stackBb: 99.5, committedBb: 0.5, status: "active", isHero: true),
+                    BattleMistakeTableSeat(seatIndex: 2, position: "BB", name: "Ivy", stackBb: 99, committedBb: 1, status: "active", isHero: false)
+                ],
+                tags: ["SB", "Q8s", "位置劣势", "高SPR"]
+            ),
+            candidates: [
+                BattleMistakeCandidate(action: "fold", label: "弃牌", targetTotalBb: 0.5, evBb: 0.1, weight: 0.50, isRecommended: true, reason: "小盲位翻后全程失位，边缘同花牌实现权益困难。"),
+                BattleMistakeCandidate(action: "call", label: "跟注", targetTotalBb: 2.5, evBb: -0.7, weight: 0.34, isRecommended: false, reason: "容易形成被动多人池，翻后难以控池。"),
+                BattleMistakeCandidate(action: "raise", label: "3-bet", targetTotalBb: 9, evBb: -0.2, weight: 0.16, isRecommended: false, reason: "阻断牌不足，面对继续范围权益不够。")
+            ],
+            whyWrong: "小盲位没有位置，Q8s 的同花潜力不足以弥补翻后实现权益差；跟注还会给大盲好价格进入底池。",
+            correctPlay: "直接弃牌或只在明确 exploit 对手过度开池时低频 3-bet，不要默认平跟。",
+            coachMessages: [
+                CoachMessageSnapshot(
+                    id: "seed_msg_sb_1",
+                    role: "agent",
+                    content: "小盲位先默认更紧。你要用更高质量的牌进入底池，因为翻后没有位置，错误会被放大。",
+                    createdAt: "2026-06-04T00:00:00+00:00"
+                )
+            ]
+        )
+    ]
+
     static let scenarios: [PreflopScenario] = [
         PreflopScenario(
             id: "pf_001",
@@ -119,6 +243,74 @@ enum MockFixtures {
             byRiverProbability: min(Double(outs) * 0.04, 0.95),
             coachingNote: "教学近似值：一张牌看 outs x 2%，两张牌看 outs x 4%。",
             isMock: true
+        )
+    }
+
+    static func reply(to id: String, message: String) -> BattleMistakeDetail? {
+        guard let detail = mistakeDetails.first(where: { $0.id == id }) ?? mistakeDetails.first else {
+            return nil
+        }
+        let userMessage = CoachMessageSnapshot(
+            id: "mock_user_msg",
+            role: "user",
+            content: message,
+            createdAt: "2026-06-05T00:00:00+00:00"
+        )
+        let agentMessage = CoachMessageSnapshot(
+            id: "mock_agent_msg",
+            role: "agent",
+            content: "先看位置、底池和 SPR：这里推荐 \(detail.recommendedActionLabel)，不是因为两张牌一定差，而是你的动作让后续街道更难盈利。",
+            createdAt: "2026-06-05T00:00:00+00:00"
+        )
+        return copy(detail, messages: detail.coachMessages + [userMessage, agentMessage])
+    }
+
+    private static func summary(_ detail: BattleMistakeDetail) -> BattleMistakeSummary {
+        BattleMistakeSummary(
+            id: detail.id,
+            title: detail.title,
+            subtitle: detail.subtitle,
+            street: detail.street,
+            position: detail.position,
+            heroCards: detail.heroCards,
+            board: detail.board,
+            userActionLabel: detail.userActionLabel,
+            recommendedActionLabel: detail.recommendedActionLabel,
+            evDeltaBb: detail.evDeltaBb,
+            icon: detail.icon,
+            accent: detail.accent,
+            createdAt: detail.createdAt
+        )
+    }
+
+    private static func copy(_ detail: BattleMistakeDetail, messages: [CoachMessageSnapshot]) -> BattleMistakeDetail {
+        BattleMistakeDetail(
+            id: detail.id,
+            title: detail.title,
+            subtitle: detail.subtitle,
+            street: detail.street,
+            position: detail.position,
+            heroCards: detail.heroCards,
+            board: detail.board,
+            userActionLabel: detail.userActionLabel,
+            recommendedActionLabel: detail.recommendedActionLabel,
+            evDeltaBb: detail.evDeltaBb,
+            icon: detail.icon,
+            accent: detail.accent,
+            createdAt: detail.createdAt,
+            ownerId: detail.ownerId,
+            sessionId: detail.sessionId,
+            handNumber: detail.handNumber,
+            actionId: detail.actionId,
+            userAction: detail.userAction,
+            recommendedAction: detail.recommendedAction,
+            userTotalBb: detail.userTotalBb,
+            recommendedTotalBb: detail.recommendedTotalBb,
+            scenario: detail.scenario,
+            candidates: detail.candidates,
+            whyWrong: detail.whyWrong,
+            correctPlay: detail.correctPlay,
+            coachMessages: messages
         )
     }
 }

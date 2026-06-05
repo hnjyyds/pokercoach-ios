@@ -26,6 +26,18 @@ struct APIClient {
         try await get("/training/hand-quiz", token: token)
     }
 
+    func mistakes(token: String) async throws -> [BattleMistakeSummary] {
+        try await get("/training/mistakes", token: token)
+    }
+
+    func mistakeDetail(id: String, token: String) async throws -> BattleMistakeDetail {
+        try await get("/training/mistakes/\(id)", token: token)
+    }
+
+    func coachMistake(id: String, message: String, token: String) async throws -> BattleMistakeDetail {
+        try await post("/training/mistakes/\(id)/coach", body: CoachMessageRequestBody(message: message), token: token)
+    }
+
     func answerPreflop(scenarioId: String, action: PokerAction, token: String) async throws -> DecisionResult {
         try await post("/training/preflop/\(scenarioId)/answer", body: AnswerRequest(action: action), token: token)
     }
